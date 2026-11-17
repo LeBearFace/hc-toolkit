@@ -2300,8 +2300,8 @@ const SET_SKIP=new Set(['shipCore','shipFac','offSel','tourShop','offMeth','ntGl
 const SET_ORDER=['Personnage','Conseils','Ordres de nuit','Gros mouvements & alertes','Anti-bruit','Flips','Gros objets','Achat immédiat','Tournée PNJ','Revente PNJ','Magasins','Trading sticks','Fish offcuts','Chantier naval','Fabrication','HC → OSRS','Autres'];
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 function setVal(k){return settings[k]}
-function lsSize(k){try{const v=localStorage.getItem(k);return v?(k.length+v.length)*2:0}catch(e){return 0}}
-function kb(n){return n>=1048576?(n/1048576).toFixed(1).replace('.',',')+' Mo':Math.max(1,Math.round(n/1024))+' Ko'}
+function lsSize(k){try{const v=localStorage.getItem(k);return v?k.length+v.length:0}catch(e){return 0}} // en caractères : c'est ce que les navigateurs limitent
+function kb(n){return n>=1e6?(n/1e6).toFixed(1).replace('.',',')+' M car.':Math.max(1,Math.round(n/1000))+' k car.'}
 function renderAtelier(){const host=hostBox();
   $('#intro').textContent='Ton atelier : choisis les modules affichés, règle tout l\'outil au même endroit, vide les caches et note tes idées pour les prochaines versions.';
   // modules
@@ -2331,7 +2331,7 @@ function renderAtelier(){const host=hostBox();
    <div class="box"><h3>⚙️ Tous les réglages <span class="mut small">(${nCh} modifié${nCh>1?'s':''})</span></h3><p class="mut small">Les mêmes réglages que dans chaque module, rassemblés ici. Une ligne surlignée a été changée ; ↺ la remet à sa valeur d'origine.</p>
     ${sets}<div class="row" style="margin-top:8px"><button class="btn" id="atlResetAll">↺ Tout remettre d'origine</button><span class="small" id="atlMsg"></span></div></div>
    <div class="box"><h3>🗄️ Caches et stockage</h3><p class="mut small">Les magasins, recettes et packs du wiki sont gardés 24 h pour démarrer vite (dernier chargement : ${stAge}). Vide-les si le wiki a changé ou si quelque chose semble faux. Tes favoris, alertes et réglages ne sont jamais touchés ici.</p>
-    <div class="kv"><div><span>Espace utilisé</span><b>${kb(tot)}</b></div><div><span>Limite du navigateur</span><b>≈ 5 Mo</b></div><div><span>Version</span><b>${esc($('#changelog').textContent)}</b></div></div>
+    <div class="kv"><div><span>Espace utilisé</span><b class="${tot>4e6?'down':''}">${kb(tot)}</b></div><div><span>Limite (Edge / Chrome)</span><b>≈ 5 M car.</b></div><div><span>Version</span><b>${esc($('#changelog').textContent)}</b></div></div>
     <div class="row" style="margin-top:8px;flex-wrap:wrap"><button class="btn" id="atlClrStatic">🔄 Recharger magasins et recettes</button><button class="btn" id="atlClrAccess">🔄 Revérifier les accès PNJ</button><button class="btn" id="atlClrLog">🧹 Vider le journal d'alertes</button></div>
     <details class="accd"><summary>Détail du stockage</summary><ul class="list">${rows.map(([k,n])=>`<li><span>${esc(k)}</span><b>${kb(n)}</b></li>`).join('')}</ul></details></div>
    <div class="box"><h3>💡 Mes idées</h3><p class="mut small">Note ici ce que tu voudrais dans les prochaines versions. « Copier tout » te donne un texte à coller à Claude.</p>
