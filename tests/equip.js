@@ -29,7 +29,7 @@ const out=await p.evaluate(()=>{const R={};const t0=performance.now();render();R
   R.tiers=eqLastPlan.tiers.map(x=>x.S+' '+x.T+' '+(x.it?eqName(x.it):'-'));R.free=eqLastPlan.free.map(x=>eqName(x.it));
   R.auto=eqLastAuto.map(a=>a.name+' '+Object.keys(a.ids).length);
   eqSt.o.style='ranged';eqCache={};render();R.planRanged=eqLastPlan.res.steps.map(s=>s.slot+':'+eqName(s.it)+(s.extra?'+'+eqName(s.extra):'')+':'+s.cost);
-  R.nan=/NaN|undefined/.test(document.getElementById('alertsHost').innerText);
+  R.dollGrid=getComputedStyle(document.querySelector('.eqdoll')).display;R.nan=/NaN|undefined/.test(document.getElementById('alertsHost').innerText);
   return R});
 console.log(JSON.stringify(out,null,1));
 // clics
