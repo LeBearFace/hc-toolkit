@@ -991,7 +991,7 @@ function potEffect(k){if(POT_FR[k])return POT_FR[k];
   const d=DIVINE.exec(k);if(d){const b=d[1].replace(/ potion$/,'');const e=POT_FR[b]||POT_FR[b+' potion'];return (e||'Boost')+' — reste au maximum 5 min sans redescendre (coûte 10 PV)'}
   if(/ mix$/.test(k)){const b=MIX_OF[k]!=null?MIX_OF[k]:k.replace(/ mix$/,' potion');const e=POT_FR[b]||POT_FR[k.replace(/ mix$/,'')];return (e?e+' ; ':'')+'mix barbare : 2 doses, et chaque dose soigne aussi quelques PV'}
   return null}
-const DRINK=/\b(ale|beer|wine|tea|cocktail|blast|punch|rum|whisky|cider|brandy|vodka|gin|stout|mead|juice|milk|bitter|slayer's respite|sq'irkjuice|grog|tonic|chocolate)\b/i;
+const DRINK=/\b(ale|beer|wine|tea|cocktail|blast|punch|rum|whisky|cider|brandy|vodka|gin|stout|mead|juice|milk|bitter|slayer's respite|sq'irkjuice|grog|tonic)\b/i;
 function consRows(){const rows=[],seen=new Set(),foodBy={};
   ((FOOD&&FOOD.list)||[]).forEach(f=>{const k=f.n.toLowerCase().replace(/\s*\(\d\)$/,'');if(!foodBy[k]||/\(\d\)$/.test(f.n))foodBy[k]=f});
   // potions : regroupées par nom, prix par dose = format le moins cher
@@ -1002,13 +1002,13 @@ function consRows(){const rows=[],seen=new Set(),foodBy={};
   for(const k in G){const g=G[k];const pu=perUnit(g.doses);const best=pu?pu.per:null,bId=pu?pu.id:null,bN=pu?pu.n:0;
     const ref=bId||(g.doses.find(d=>d.n===4)||g.doses.sort((a,b)=>b.n-a.n)[0]).id;const f=foodBy[k];seen.add(k);
     const per=f&&f.per?f.per:null;const eff=potEffect(k);
-    rows.push(Object.assign({},base(ref),{name:g.name,cKind:'Potion',cEff:eff||(MAP[ref].examine||''),cEn:!eff,cHeal:per,cHealTxt:f?f.h+(f.bites>1?' (par dose : '+f.per+')':''):'',cUnit:best,cBest:bN?`dose la moins chère : (${bN})${pu.thin?' · peu échangé':''}`:'',cHp:best&&per?best/per:null,cNote:''}))}
+    rows.push(Object.assign({},base(ref),{name:g.name,cKind:'Potion',cEff:eff||(MAP[ref].examine||''),cEn:!eff,cHeal:per,cHealTxt:f?f.h+(f.bites>1?' (par dose : '+f.per+')':''):'',cUnit:best,cBest:bN?`dose la moins chère : (${bN})${pu.thin?' · peu échangé':''}`:'',cHp:best&&per?best/per:null,cThin:!!(pu&&pu.thin),cNote:''}))}
   // nourriture et boissons
   ((FOOD&&FOOD.list)||[]).forEach(f=>{const k=f.n.toLowerCase();if(seen.has(k)||seen.has(k.replace(/\s*\(\d\)$/,'')))return;seen.add(k);
     const id=BYNAME[k]||null;const tot=f.per!=null?f.per*f.bites:null;const p=id?unitPrice(id):null;
     const b=id?base(id):{id:null,m:fakeM(f.n,f.mem),name:f.n};
     rows.push(Object.assign({},b,{cKind:DRINK.test(f.n)?'Boisson':'Nourriture',cEff:tot!=null?`Soigne ${tot} PV`+(f.bites>1?` en ${f.bites} bouchées`:''):f.h?`Soigne ${f.h} PV`:'',cEn:false,
-      cHeal:tot,cHealTxt:f.h,cUnit:p,cBest:'',cHp:p&&tot?p/tot:null,cNote:f.note,cSk:f.sk}))});
+      cHeal:tot,cHealTxt:f.h,cUnit:p,cBest:'',cHp:p&&tot?p/tot:null,cThin:!!(id&&((D24[id]||{}).highPriceVolume||0)<5),cNote:f.note,cSk:f.sk}))});
   const K=settings.consKind;return rows.filter(r=>K==='all'||(K==='food'?r.cKind!=='Potion':r.cKind==='Potion'))}
 
 /* ---------- views ---------- */
@@ -1023,7 +1023,7 @@ const COLS={
   cEff:{h:'Ce que ça fait',l:1,v:r=>r.cEff||'',f:r=>`${r.cEff?`<span${r.cEn?' class="mut" title="Texte du jeu (anglais)"':''}>${esc(r.cEff)}</span>`:'<span class="mut">N/A</span>'}${r.cNote?`<div class="mut" style="font-size:11px" title="Note du wiki">${esc(r.cNote)}</div>`:''}`},
   cHeal:{h:'PV soignés',v:r=>r.cHeal,f:r=>r.cHeal!=null?`<b>${r.cHeal}</b>${r.cHealTxt&&String(r.cHealTxt)!==String(r.cHeal)?`<div class="mut" style="font-size:11px">${esc(r.cHealTxt)}</div>`:''}`:(r.cHealTxt?`<span class="mut">${esc(r.cHealTxt)}</span>`:'<span class="mut">–</span>'),t:'Total par objet (toutes les bouchées), ou par dose pour les potions. Les brews et l\'anglerfish dépendent de tes PV : valeur affichée à 99 PV.'},
   cUnit:{h:'Prix / unité ou dose',v:r=>r.cUnit,f:r=>r.cUnit!=null?gpc(r.cUnit)+(r.cBest?`<div class="mut" style="font-size:11px">${r.cBest}</div>`:''):'<span class="mut">N/A</span>',t:'Achat rapide au GE. Potions : prix d\'une dose, avec le format le moins cher.'},
-  cHp:{h:'gp par PV',v:r=>r.cHp,f:r=>r.cHp!=null?`<b>${r.cHp<10?r.cHp.toFixed(1).replace('.',','):gp(r.cHp)}</b>`:'<span class="mut">N/A</span>',t:'Prix payé pour soigner 1 PV : plus c\'est bas, plus la nourriture est économique'},
+  cHp:{h:'gp par PV',v:r=>r.cThin?null:r.cHp,f:r=>{if(r.cHp==null)return '<span class="mut">N/A</span>';const t=r.cHp<10?r.cHp.toFixed(1).replace('.',','):gp(r.cHp);return r.cThin?`<span class="mut" title="Presque jamais acheté sur le GE (moins de 5 achats en 24 h) : prix peu fiable, classé en bas">${t} · peu échangé</span>`:`<b>${t}</b>`},t:'Prix payé pour soigner 1 PV : plus c\'est bas, plus la nourriture est économique'},
   buy:{h:'Achat',v:r=>r.buy,f:r=>gpc(r.buy),t:'Dernier prix de vente instantanée (ce que tu paies en offre basse)'},
   sell:{h:'Vente',v:r=>r.sell,f:r=>gpc(r.sell),t:'Dernier prix d\'achat instantané (ce que tu obtiens en offre haute)'},
   margin:{h:'Marge',v:r=>r.margin,f:r=>`<span class="${cls(r.margin)}">${gp(r.margin)}</span>`},
