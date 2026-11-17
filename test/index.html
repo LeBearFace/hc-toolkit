@@ -356,6 +356,8 @@ body.compact #compactBtn{background:linear-gradient(#94351f,var(--sel));color:va
 tr.atl-ch td{background:color-mix(in srgb,var(--yel,#d4a017) 14%,transparent)}
 .atl-ideas li.atl-done span{opacity:.55;text-decoration:line-through}
 body.compact .atl-mods{grid-template-columns:1fr}
+/* 1.1 : sous ~1200 px la barre du haut passe sur 2 lignes (avant : ⚙ et ⇔ sortaient de l'écran) */
+@media (max-width:1200px){.bar{flex-wrap:wrap}.search{min-width:200px}}
 </style>
 </head>
 <body>
