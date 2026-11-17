@@ -2932,9 +2932,9 @@ async function eqImport(files){const k=profile.name||'moi';const s=new Set(eqSt.
   eqSt.owned[k]=[...s];eqSave();render();const m=$('#eqfilemsg');if(m)m.textContent=`${seen} objets lus, ${n} pièces d'équipement ajoutées.`}
 VIEWS.equip={label:'Équipement ⚔️',custom:true,render:()=>renderEquip()};
 /* ---------- 1.2 : 🗺️ Clue scrolls (récompenses des Treasure Trails, prix HC et OSRS) ----------
-   Source : pages wiki « Reward casket (niveau) », relues une fois par semaine (clé hcx_clues1). */
+   Source : pages wiki « Reward casket (niveau) », relues une fois par semaine (clé hcx_clues2). */
 const CL_TIERS=[['beginner','Débutant'],['easy','Facile'],['medium','Moyen'],['hard','Difficile'],['elite','Élite'],['master','Maître']];
-let CLUES=store.get('clues1',null),cluesLoading=null,cluesErr='';
+let CLUES=(c=>c&&c.tiers&&CL_TIERS.every(t=>c.tiers[t[0]]&&c.tiers[t[0]].items)?c:null)(store.get('clues2',null)),cluesLoading=null,cluesErr='';
 let clSt=Object.assign({tier:'hard',sort:'vhc',q:''},store.get('clSt',{}));
 function clExpr(s){ // évalue {{#expr: ... }} (avec « round N »)
   return s.replace(/\{\{#expr:([^{}]*)\}\}/gi,(m,e)=>{e=e.trim();let r=null;const rm=/^(.*)\sround\s+(\d+)$/i.exec(e);const body=rm?rm[1]:e;
@@ -2958,7 +2958,7 @@ async function cluesLoad(force){if(cluesLoading)return cluesLoading;if(!force&&C
   cluesLoading=(async()=>{try{const A=WIKI+'api.php?format=json&origin=*&action=query&prop=revisions&rvprop=content&rvslots=main&titles=';
     const q=await j(A+encodeURIComponent(CL_TIERS.map(t=>'Reward casket ('+t[0]+')').join('|')));const tiers={};
     Object.values(q.query.pages||{}).forEach(p=>{const m=/\((\w+)\)/.exec(p.title);const rv=p.revisions&&p.revisions[0];if(!m||!rv)return;tiers[m[1]]=clParse(rv.slots?rv.slots.main['*']:rv['*'])});
-    if(Object.keys(tiers).length<6)throw new Error('pages incomplètes');CLUES={t:Date.now(),tiers};store.set('clues1',CLUES);cluesErr=''}catch(e){cluesErr=String(e.message||e)}
+    if(Object.keys(tiers).length<6)throw new Error('pages incomplètes');CLUES={t:Date.now(),tiers};store.set('clues2',CLUES);try{localStorage.removeItem('hcx_clues1')}catch(e){};cluesErr=''}catch(e){cluesErr=String(e.message||e)}
     cluesLoading=null;if(tab==='clues')render()})();return cluesLoading}
 function clPrice(id,os){const l=(os?OS_LAT:LAT)[id];if(!l)return null;return l.high&&l.low?(l.high+l.low)/2:(l.high||l.low||null)}
 function clVol(id,os){const d=(os?OS_D24:D24)[id];return d?(d.highPriceVolume||0)+(d.lowPriceVolume||0):null}
