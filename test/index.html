@@ -1058,7 +1058,7 @@ VIEWS.prog={label:'Progression & XP',custom:true,render:()=>renderProg()};
 VIEWS.advice={label:'Conseils 💰',custom:true,render:()=>renderAdvice()};
 VIEWS.night={label:'Ordres de nuit 🌙',custom:true,render:()=>renderNight()};
 VIEWS.ship={label:'Chantier naval ⛵',custom:true,render:()=>renderShip()};
-VIEWS.sticks={label:'Trading sticks 🪵',custom:true,render:()=>renderSticks()};
+VIEWS.sticks={label:'Trading sticks 🌴',custom:true,render:()=>renderSticks()};
 VIEWS.home={label:'Accueil',custom:true,render:()=>renderHome()};
 VIEWS.tour={label:'Tournée PNJ 🔁',custom:true,render:()=>renderTour()};
 VIEWS.runes={label:'Runes en magasin 🔮',custom:true,render:()=>renderRunes()};
@@ -1078,7 +1078,7 @@ function itemCell(r){
 /* ---------- navigation par thèmes : chaque onglet dit quel mouvement il propose ---------- */
 const GROUPS=[['home','🏠 Accueil',['home']],['plan','🧭 Mon plan',['advice','night','instant','prog']],['ge','📈 Bourse (GE)',['flips','big','hits','favs','all']],
   ['npc','🏪 PNJ & magasins',['tour','dir','resell','ward','sticks','runes','epic','shops','packs','sets']],['make','⚗️ Transformer',['alch','craft','offcuts','ship']],...(WORLD==='osrs'?[]:[['hc','🌍 HC → OSRS',['cross','transfer']]]),['alerts','🔔 Alertes',['alerts']],['admin','🛠️ Atelier',['atelier']]];
-const MOVES={tour:['📈 Offres basses au GE','🏪 Vends 1 de chaque au PNJ','🔁 Change de monde'],runes:['🏪 Achète au PNJ','💰 Économise sur le GE'],offcuts:['🏪 Poissons chez Frankie','🔪 Coupe sur place','📈 Revends les offcuts'],sticks:['📈 Achète des opales au GE','💎 Vends-les à Gabooty (Tai Bwo Wannai) contre des sticks','🪵 Machette, gout tuber ou sticks à revendre'],ship:['⛵ Choisis tes pièces','🛒 Offres basses au GE (ou PNJ moins cher)','🔨 Construis au chantier'],night:['🌙 Offres d\'achat basses au GE avant de dormir','☀️ Le matin, récupère','🏪 Revends au PNJ (change de monde)'],advice:['💰 Ton capital','🛒 Liste de courses, du plus sûr au plus risqué'],instant:['⚡ Achète tout de suite au GE','🛠️ PNJ, alch, craft, pack ou ensemble','💰 Profit immédiat'],
+const MOVES={tour:['📈 Offres basses au GE','🏪 Vends 1 de chaque au PNJ','🔁 Change de monde'],runes:['🏪 Achète au PNJ','💰 Économise sur le GE'],offcuts:['🏪 Poissons chez Frankie','🔪 Coupe sur place','📈 Revends les offcuts'],sticks:['📈 Achète des opales au GE','💎 Vends-les à Gabooty (Tai Bwo Wannai) contre des sticks','🌴 Machette, gout tuber ou sticks à revendre'],ship:['⛵ Choisis tes pièces','🛒 Offres basses au GE (ou PNJ moins cher)','🔨 Construis au chantier'],night:['🌙 Offres d\'achat basses au GE avant de dormir','☀️ Le matin, récupère','🏪 Revends au PNJ (change de monde)'],advice:['💰 Ton capital','🛒 Liste de courses, du plus sûr au plus risqué'],instant:['⚡ Achète tout de suite au GE','🛠️ PNJ, alch, craft, pack ou ensemble','💰 Profit immédiat'],
   prog:['🎯 Ton niveau','📚 La méthode la moins chère','🗺️ Ton plan d\'XP'],
   flips:['📈 Offre d\'achat basse au GE','⏳ Attends qu\'elle se remplisse','📈 Revends plus haut au GE'],big:['📈 Offre d\'achat basse','⏳ Patience (peu d\'échanges)','📈 Revends avec un gros écart'],
   hits:['👀 Repère une forte hausse ou chute','📈 Achète ou vends au bon moment'],favs:['★ Tes objets suivis','⏱️ Prix en direct'],all:['🔎 Tous les objets du GE HC'],
@@ -1713,7 +1713,7 @@ function syncHeader(){const h=$('#hd');if(h)document.documentElement.style.setPr
 /* ---------- accueil ---------- */
 const HOME_TILES=[['advice','💰','Conseils','Ta liste de courses selon ton capital'],['night','🌙','Ordres de nuit','Offres à laisser tourner, capital par alt'],['tour','🔁','Tournée PNJ','1 objet par monde : ce qui rapporte, magasin par magasin'],
   ['instant','⚡','Achat immédiat','Ce qui rapporte tout de suite'],['favs','★','Favoris en direct','Prix toutes les 10 s, flèches'],['offcuts','🐟','Fish offcuts','Poissons de Frankie → offcuts'],
-  ['sticks','🪵','Trading sticks','Gemmes → sticks → machettes'],['ship','⛵','Chantier naval','Pièces de bateau, offres basses'],['dir','📍','Annuaire PNJ','Carte, stock, accès et prérequis'],
+  ['sticks','🌴','Trading sticks','Gemmes → sticks → machettes'],['ship','⛵','Chantier naval','Pièces de bateau, offres basses'],['dir','📍','Annuaire PNJ','Carte, stock, accès et prérequis'],
   ['craft','🔨','Fabrication','Toutes les recettes rentables'],['prog','🎯','Progression','Ton plan d\'XP le moins cher'],['flips','📈','Flips','Acheter bas, revendre haut']];
 function renderHome(){const host=hostBox();$('#intro').textContent='';
   let opps=[];try{opps=adviceList().list.slice(0,6)}catch(e){}
@@ -1939,7 +1939,7 @@ const CHANGELOG=`<div class="dh"><h2>Nouveautés</h2><button class="btn" id="clo
   <li><span><b>Runes en magasin 🔮</b> et <b>Fish offcuts 🐟</b> (Frankie, couteau ou chum station, historique 7 jours).</span></li>
   <li><span>Réglages (son, voix, notifications, sauvegarde, Karamja gloves) regroupés dans le menu ⚙.</span></li></ul></div>
  <div class="box"><h3>v2.1 · 17 novembre 2026</h3><ul class="list">
-  <li><span><b>Trading sticks 🪵</b> (PNJ & magasins) : quelle gemme vendre à Gabooty, prix de revient d'un stick, et ce que rapportent machettes, gout tuber ou sticks revendus au GE.</span></li>
+  <li><span><b>Trading sticks 🌴</b> (PNJ & magasins) : quelle gemme vendre à Gabooty, prix de revient d'un stick, et ce que rapportent machettes, gout tuber ou sticks revendus au GE.</span></li>
   <li><span><b>Karamja gloves</b> : case à cocher dans « Revente aux PNJ », « Trading sticks » et « Ordres de nuit ». Obli (Shilo) rachète alors tout objet à 60 %, Davon à 100 %, Fernahei à 80 %.</span></li>
   <li><span><b>Chantier naval ⛵</b> (Transformer) : choisis bateau, pièces principales et installations ; l'outil additionne les matériaux, propose une offre basse pour chacun (prix bas habituel sur 7 jours), signale les PNJ moins chers (clous du Sawmill…) et les objets peu échangés. Préréglages Jubbly Jive et Pirate shipwreck.</span></li>
   <li><span><b>Ordres de nuit 🌙</b> (Mon plan) : offres GE basses à laisser tourner la nuit et revente garantie à un PNJ le lendemain. Quantités calculées selon la nuit, les vendeurs captés et les mondes à visiter ; capital à donner à chaque alt par paquet d'emplacements GE ; capital disponible optionnel.</span></li></ul></div>
@@ -2305,7 +2305,7 @@ function kb(n){return n>=1e6?(n/1e6).toFixed(1).replace('.',',')+' M car.':Math.
 function renderAtelier(){const host=hostBox();
   $('#intro').textContent='Ton atelier : choisis les modules affichés, règle tout l\'outil au même endroit, vide les caches et note tes idées pour les prochaines versions.';
   // modules
-  const mods=GROUPS.filter(g=>g[0]!=='home').map(([k,l,sub])=>`<div class="atl-g"><b>${l}</b>${sub.filter(t=>VIEWS[t]&&!ATL_KEEP.has(t)).map(t=>`<label><input type="checkbox" data-mod="${t}" ${modHidden(t)?'':'checked'}> ${esc(VIEWS[t].label)}</label>`).join('')}</div>`).join('');
+  const mods=GROUPS.filter(g=>g[2].some(t=>VIEWS[t]&&!ATL_KEEP.has(t))).map(([k,l,sub])=>`<div class="atl-g"><b>${l}</b>${sub.filter(t=>VIEWS[t]&&!ATL_KEEP.has(t)).map(t=>`<label><input type="checkbox" data-mod="${t}" ${modHidden(t)?'':'checked'}> ${esc(VIEWS[t].label)}</label>`).join('')}</div>`).join('');
   // réglages
   const keys=[...new Set([...Object.keys(DEFAULTS),...Object.keys(settings)])].filter(k=>!SET_SKIP.has(k)&&typeof (settings[k]??DEFAULTS[k])!=='object');
   const bySec={};keys.forEach(k=>{const sec=(SET_INFO[k]||['Autres'])[0];(bySec[sec]=bySec[sec]||[]).push(k)});
