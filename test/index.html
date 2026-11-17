@@ -2795,6 +2795,7 @@ function renderEquip(){const host=hostBox();const o=eqSt.o;
   const tot=EQ_SLOTS.reduce((a,s)=>{const it=cur[s];const c=it?eqCost(it,own):0;return a+(c||0)},0);
   const warn=[];if(r.why)warn.push(r.why);if(r.fire)warn.push('🔥 Souffle de dragon : prends un bouclier anti-dragon (gratuit chez le duc de Lumbridge) ou coche « potion antifeu ».');
   if(cur.weapon&&cur.weapon.two&&cur.shield)warn.push('Arme à deux mains : le bouclier est ignoré.');
+  if(isFinite(r.hpLost)&&r.hpLost>eqLv('Hitpoints')&&!o.protect)warn.push(`⚠ Un kill te coûte environ ${Math.round(r.hpLost)} PV, plus que tes ${eqLv('Hitpoints')} PV : prévois de la nourriture${eqLv('Prayer')>=43&&r.mt!=='magic'&&r.mt!=='ranged'?' ou active Protect from Melee (43 Prière) et coche « Prière de protection »':eqLv('Prayer')>=40?' ou une prière de protection':''}.`);
   const B=r.t||eqSum(cur);
   h+=`<div class="eqgrid"><section class="box"><h3>Mannequin <span class="small mut">(clic = choisir la pièce)</span></h3><div class="eqdoll">${doll}</div>
     <div class="kv" style="margin-top:10px"><div><span>Coup max</span><b>${r.max||0}</b></div><div><span>Précision</span><b>${fmt1((r.acc||0)*100)} %</b></div>
@@ -2855,7 +2856,7 @@ function eqPlanHtml(cur,style,mon,own){const o=eqSt.o;
   return `<section class="box"><div class="h2s"><h3>🧭 Plan d'achat pour ${eqB(+o.budget)}</h3><span class="row" style="gap:6px">
     <button class="pill${o.order==='rentable'?' gold':''}" data-eqorder="rentable" style="cursor:pointer;border:0">💰 Plus rentable (gain par gp)</button>
     <button class="pill${o.order==='puissant'?' gold':''}" data-eqorder="puissant" style="cursor:pointer;border:0">🔥 Plus puissant (gros gain d'abord)</button></span></div>
-    ${res.steps.length?`<ol class="eqplan">${res.steps.map(st=>{cum+=st.cost;return `<li data-eqpick="${st.it.id}" data-eqpslot="${st.slot}" style="cursor:pointer"><img src="${eqImg(st.it)}" alt=""> <b>${esc(eqName(st.it))}</b> <span class="mut">(${EQ_SLFR[st.slot]})</span>${eqLot(st.it)?` ×${o.ammoLot}`:''} · ${st.cost?gp(st.cost):'<span class="up">déjà à toi</span>'} <span class="mut">· cumul ${gp(cum)}</span></li>`}).join('')}</ol>
+    ${res.steps.length?`<ol class="eqplan">${res.steps.map(st=>{cum+=st.cost;return `<li data-eqpick="${st.it.id}" data-eqpslot="${st.slot}" style="cursor:pointer"><img src="${eqImg(st.it)}" alt=""> <b>${esc(eqName(st.it))}</b> <span class="mut">(${EQ_SLFR[st.slot]})</span>${eqLot(st.it)?` ×${o.ammoLot}`:''} · ${own.has(st.it.id)?'<span class="up">déjà à toi</span>':gp(st.cost)} <span class="mut">· cumul ${gp(cum)}</span></li>`}).join('')}</ol>
     <div class="kv"><div><span>DPS</span><b>${(r0.dps||0).toFixed(2).replace('.',',')} → <span class="gold">${res.r.dps.toFixed(2).replace('.',',')}</span></b></div><div><span>Gain</span><b class="up">${r0.dps>0?'+'+fmt1(eqPct(res.r.dps,r0.dps))+' %':'–'}</b></div>
     <div><span>PV perdus / kill</span><b>${isFinite(r0.hpLost)?fmt1(r0.hpLost):'–'} → ${fmt1(res.r.hpLost)}</b></div><div><span>Dépensé</span><b>${gp(res.spent)}</b> <span class="small mut">reste ${gp(+o.budget-res.spent)}</span></div></div>
     <button class="btn primary" data-eqa="apply">Essayer ce plan sur le mannequin</button>`:`<p>Rien de mieux à acheter avec ce budget pour cet objectif : ta tenue est déjà la meilleure possible, ou il faut monter un niveau (voir plus bas) ou le budget.</p>`}
