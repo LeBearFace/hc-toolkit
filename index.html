@@ -356,7 +356,7 @@ body.compact #compactBtn{background:linear-gradient(#94351f,var(--sel));color:va
 <body>
 <header id="hd">
   <div class="bar">
-    <div class="logo"><button class="logo-b" data-tab="home" title="Accueil"><span class="logo-mark" aria-hidden="true">HC</span><span class="logo-t">HC Toolkit</span></button><small class="logo-s">Hardcore Worlds · <button class="linkish" id="changelog" title="Nouveautés">v1.0</button></small></div>
+    <div class="logo"><button class="logo-b" data-tab="home" title="Accueil"><span class="logo-mark" aria-hidden="true">HC</span><span class="logo-t">HC Toolkit</span></button><small class="logo-s">Hardcore Worlds · <button class="linkish" id="changelog" title="Nouveautés">v1.0.1</button></small></div>
     <div class="search"><input id="q" type="search" placeholder="Rechercher un objet…   ( / )" autocomplete="off"><button class="btn kbtn" id="palBtn" title="Aller n'importe où (Ctrl+K)">⌘K</button></div>
     <div class="ctrl">
       <span class="status" id="status">Chargement…</span>
@@ -467,6 +467,9 @@ function pct(n){return n==null||!isFinite(n)?'–':(n>0?'+':'')+n.toFixed(1).rep
 function ago(t){if(!t)return '–';const s=Math.max(0,Date.now()/1000-t);if(s<60)return Math.round(s)+' s';if(s<3600)return Math.round(s/60)+' min';if(s<86400)return Math.round(s/3600)+' h';return Math.round(s/86400)+' j'}
 function cls(n){return n>0?'up':n<0?'down':'mut'}
 function norm(s){return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'')}
+/* 1.0.1 : le wiki liste parfois deux fois la même ligne de magasin (ex. Baba Yaga « post-quest » + sans note) */
+function dedupeShops(list){const best={};list.forEach(s=>{const k=[s.item,s.shop,s.price,s.buy,s.stock,s.delta,s.restock,s.smult,s.bmult].join('|');
+  if(!best[k]||String(s.notes||'').length<String(best[k].notes||'').length)best[k]=s});const keep=new Set(Object.values(best));return list.filter(s=>keep.has(s))}
 function icon(m){return m&&m.icon?WIKI+'images/'+encodeURIComponent(m.icon.replace(/ /g,'_')):''}
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
 
@@ -477,7 +480,7 @@ async function loadStatic(){
   MAP={};BYNAME={};map.forEach(m=>{MAP[m.id]=m;BYNAME[m.name.toLowerCase()]=m.id});
   // shops + recipes from the OSRS wiki, cached 24 h
   const cache=store.get('static8',null);
-  if(cache&&Date.now()-cache.t<864e5){SHOPS=cache.shops;RECIPES=cache.recipes;QXP=cache.qxp||[];PACKS_DATA=cache.packs||[];SETS_DATA=cache.sets||[];SHOPINFO=cache.shopinfo||{};markDanger();loadMapVer();return}
+  if(cache&&Date.now()-cache.t<864e5){SHOPS=dedupeShops(cache.shops.map(x=>x.stock==null?Object.assign({},x,{stock:Infinity}):x)); /* 1.0.1 : JSON transforme Infinity en null */RECIPES=cache.recipes;QXP=cache.qxp||[];PACKS_DATA=cache.packs||[];SETS_DATA=cache.sets||[];SHOPINFO=cache.shopinfo||{};markDanger();loadMapVer();return}
   try{
     const bq=async(q)=>{let all=[];for(let off=0;off<30000;off+=5000){const r=await j(WIKI+'api.php?action=bucket&format=json&origin=*&query='+encodeURIComponent(q.replace('OFF',off)));all=all.concat(r.bucket||[]);if((r.bucket||[]).length<5000)break}return all};
     const sl=await bq("bucket('storeline').select('sold_item','sold_by','store_sell_price','store_buy_price','store_delta','store_stock','store_sell_multiplier','store_buy_multiplier','restock_time','store_currency','store_notes').limit(5000).offset(OFF).run()");
@@ -487,6 +490,7 @@ async function loadStatic(){
         dlg:String(s.restock_time)==='N/A'&&st==='∞'&&!num(s.store_delta),stock:st==='∞'?Infinity:num(st),smult:num(s.store_sell_multiplier)||1000,bmult:num(s.store_buy_multiplier),restock:num(s.restock_time),
         notes:String(s.store_notes||'').replace(/\[\[([^\]|]*)\|([^\]]*)\]\]/g,'$2').replace(/\[\[([^\]]*)\]\]/g,'$1').replace(/<[^>]+>|\{\{[^}]*\}\}|'''?/g,'').trim().slice(0,160)}})
       .filter(s=>s.price>0||s.buy>0);
+    SHOPS=dedupeShops(SHOPS);
     PACKS_DATA=await loadPacks();SETS_DATA=await loadSets();SHOPINFO=await loadShopInfo(new Set(SHOPS.map(x=>x.shop)));markDanger();loadMapVer();
     const rc=await bq("bucket('recipe').select('page_name','production_json').limit(5000).offset(OFF).run()");
     const unlink=s=>String(s||'').replace(/\[\[([^\]|]*)\|([^\]]*)\]\]/g,'$2').replace(/\[\[([^\]]*)\]\]/g,'$1').trim();
@@ -584,11 +588,21 @@ function base(id){
   const lim=m.limit||null;
   // écart entre le dernier trade et la moyenne 24 h (repère les trades isolés aberrants)
   const dv=(x,a)=>x&&a?Math.abs(x-a)/a*100:0;
-  const dev=Math.max(dv(buy,d.avgLowPrice),dv(sell,d.avgHighPrice));
+  // 1.0.1 : un trade n'est « aberrant » que s'il s'écarte aussi de la dernière heure (quand elle a au moins 5 échanges de ce côté)
+  const hL=h.lowPriceVolume?h.avgLowPrice:null,hH=h.highPriceVolume?h.avgHighPrice:null;
+  const sideDev=(x,a24,a1,v1s)=>{const d24=dv(x,a24);return a1&&v1s>=5?Math.min(d24,dv(x,a1)):d24};
+  const dev=Math.max(sideDev(buy,d.avgLowPrice,hL,h.lowPriceVolume||0),sideDev(sell,d.avgHighPrice,hH,h.highPriceVolume||0));
+  // 1.0.1 : variation 1 h / 24 h comparée côté par côté (avant : un seul côté échangé dans l'heure faisait croire à une chute)
+  let chg=null;
+  if(hL&&hH&&m24)chg=(m1-m24)/m24*100;
+  else if(hL&&d.avgLowPrice)chg=(hL-d.avgLowPrice)/d.avgLowPrice*100;
+  else if(hH&&d.avgHighPrice)chg=(hH-d.avgHighPrice)/d.avgHighPrice*100;
+  // moins d'1 gp d'écart (objets à 1-5 gp) : pas un vrai mouvement
+  if(chg!=null){const ref=hL&&hH?m24:hL?d.avgLowPrice:d.avgHighPrice;if(Math.abs(chg/100*ref)<1)chg=0}
   return{id:+id,m,name:m.name,buy,sell,margin,mpct:margin!=null&&buy?margin/buy*100:null,v24,vmin24,v1,dev,
     hv:d.highPriceVolume||0,lv:d.lowPriceVolume||0,aH:d.avgHighPrice||null,aL:d.avgLowPrice||null,tH:l.highTime||0,tL:l.lowTime||0,
     oldest:Math.min(l.highTime||0,l.lowTime||0),
-    chg:m1&&m24?(m1-m24)/m24*100:null,limit:lim,
+    chg,limit:lim,
     pot:margin!=null?margin*Math.min(lim||Infinity,vmin24/6):null,
     alch:m.highalch&&sell?m.highalch-sell-natPrice:null,
     last:Math.max(l.highTime||0,l.lowTime||0)};
@@ -1898,7 +1912,14 @@ function setLive(sec){liveSec=+sec;store.set('liveSec',liveSec);clearInterval(li
 function favRows(){const ids=[...favs].filter(id=>MAP[id]);hcwWant(ids);wantSpark(ids);return ids.map(id=>base(id))}
 
 const CHANGELOG=`<div class="dh"><h2>Nouveautés</h2><button class="btn" id="close">Fermer</button></div>
- <div class="box"><h3>v1.0 « Toolkit » · 17 novembre 2026</h3><ul class="list">
+ <div class="box"><h3>v1.0.1 · 17 novembre 2026</h3><ul class="list">
+  <li><span><b>Stocks illimités</b> : au 2ᵉ lancement de la journée, les 758 lignes de magasins à stock ∞ (plumes, runes de base…) passaient à 0 et disparaissaient des calculs. Corrigé.</span></li>
+  <li><span><b>Alertes « chute / hausse »</b> : la variation 1 h compare maintenant le même côté du marché. Fini les fausses chutes quand seuls les vendeurs ont échangé dans l'heure (ex. Red feather −37 %).</span></li>
+  <li><span><b>« Prix suspect »</b> : un objet qui a vraiment bougé n'est plus marqué suspect ; seul un trade isolé, loin de la moyenne 24 h <i>et</i> de la dernière heure, l'est.</span></li>
+  <li><span><b>Magasins en double</b> : 224 lignes recopiées deux fois par le wiki (ex. Baba Yaga) sont fusionnées.</span></li>
+  <li><span>L'outil est en ligne : <b>lebearface.github.io/hc-toolkit</b>.</span></li>
+</ul></div>
+<div class="box"><h3>v1.0 « Toolkit » · 17 novembre 2026</h3><ul class="list">
   <li><span><b>Nouveau portail</b> : barre latérale avec tous les modules, page d'accueil (meilleures occasions, favoris, raccourcis), palette <b>Ctrl+K</b> pour aller à n'importe quel module, objet ou magasin.</span></li>
   <li><span><b>Mode panneau ⇔</b> : interface étroite à coller à côté du jeu ; le lanceur « à côté du jeu » ouvre une fenêtre collée au bord droit de l'écran.</span></li>
   <li><span><b>Deux mondes</b> : Hardcore Worlds ou OSRS normal (bouton sur l'accueil). Sur le jeu normal, la taxe GE de 2 % est déduite partout où tu revends au GE.</span></li>
