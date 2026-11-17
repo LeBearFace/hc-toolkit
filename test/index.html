@@ -363,7 +363,7 @@ body.compact .atl-mods{grid-template-columns:1fr}
 <body>
 <header id="hd">
   <div class="bar">
-    <div class="logo"><button class="logo-b" data-tab="home" title="Accueil"><span class="logo-mark" aria-hidden="true">HC</span><span class="logo-t">HC Toolkit</span></button><small class="logo-s">Hardcore Worlds · <button class="linkish" id="changelog" title="Nouveautés">v1.1</button></small></div>
+    <div class="logo"><button class="logo-b" data-tab="home" title="Accueil"><span class="logo-mark" aria-hidden="true">HC</span><span class="logo-t">HC Toolkit</span></button><small class="logo-s">Hardcore Worlds · <button class="linkish" id="changelog" title="Nouveautés">v1.2</button></small></div>
     <div class="search"><input id="q" type="search" placeholder="Rechercher un objet…   ( / )" autocomplete="off"><button class="btn kbtn" id="palBtn" title="Aller n'importe où (Ctrl+K)">⌘K</button></div>
     <div class="ctrl">
       <span class="status" id="status">Chargement…</span>
@@ -420,7 +420,7 @@ let rules=store.get('rules',[]);           // {id, dir:'above'|'below', price}
 let alertLog=store.get('alertlog',[]);     // {t, msg}
 let fired=store.get('fired',{});           // key -> timestamp
 const DEFAULTS={minVol:100,minPct:1,hitPct:10,hitVol:200,hitScope:'all',hitOn:true,
-  noise:true,nzVol:50,nzAge:6,nzPct:200,nzDev:50,xMode:'cheap',shopDir:'buy',bigTrades:10,bigPct:5,bigGp:20000,bigAge:12,tfTarget:1,tfDays:7,tfShare:25,tfNoBond:false,tfMinVol:20,advCap:1000000,advRisk:1,advMinRoi:1,advMinProfit:2000,instMin:2000,chSafe:false,dirMode:'item',wardAll:false,rsN:10,rsGen:false,epK:50,epGen:true,ntH:8,ntCap:50,ntW:40,ntSlots:8,ntGloves:true,ntMin:5000,ntBudget:0,shipBoat:'Skiff',shipBuy:true,shipSail:61,shipCon:50,shipCore:{},shipFac:{},shipSplit:'auto',kGloves:false,stkN:35};
+  noise:true,nzVol:50,nzAge:6,nzPct:200,nzDev:50,xMode:'cheap',shopDir:'buy',bigTrades:10,bigPct:5,bigGp:20000,bigAge:12,tfTarget:1,tfDays:7,tfShare:25,tfNoBond:false,tfMinVol:20,advCap:1000000,advRisk:1,advMinRoi:1,advMinProfit:2000,instMin:2000,chSafe:false,dirMode:'item',wardAll:false,rsN:10,rsGen:false,epK:50,epGen:true,ntH:8,ntCap:50,ntW:40,ntSlots:8,ntGloves:true,ntMin:5000,ntBudget:0,shipBoat:'Skiff',shipBuy:true,shipSail:61,shipCon:50,shipCore:{},shipFac:{},shipSplit:'auto',kGloves:false,stkN:35,teleWild:false,consKind:'all'};
 let settings=Object.assign(JSON.parse(JSON.stringify(DEFAULTS)),store.get('settings',{})); // 1.1 : valeurs d'origine dans DEFAULTS (Atelier)
 let OS_LAT={},OS_D24={},QXP=[],PACKS_DATA=[],SETS_DATA=[],SHOPINFO={},MAPVER={0:'2019-10-31_1'};
 /* contenu de tous les packs du jeu (catégorie wiki « Item packs ») */
@@ -885,9 +885,140 @@ function wardRows(){const rows=[];const NO=new Set([BOND,995,13204]);
     const P=n=>sellBatch(m.value,55,2,n)-n*ge;const p1=P(1);if(!settings.wardAll&&p1<=0)continue;if(settings.noise&&!settings.wardAll&&b.lv<settings.nzVol)continue;
     rows.push(Object.assign({},b,{ge,w0:Math.floor(m.value*0.55+1e-6),w1:p1,w5:P(5),w10:P(10),w50:P(50),wGen:Math.floor(m.value*0.4+1e-6)-ge,rsHa:m.highalch?m.highalch-natPrice-ge:null,sellers:b.lv}))}
   return rows}
+/* ================= 1.2 : TÉLÉPORTATIONS et CONSOMMABLES ================= */
+/* Téléportations : tablettes, parchemins et bijoux à charges. [nom exact GE, destination, prérequis connu, Wilderness] */
+const TELES=[
+  ['Varrock teleport (tablet)','Varrock, place centrale','',0],['Lumbridge teleport (tablet)','Château de Lumbridge','',0],
+  ['Falador teleport (tablet)','Falador, place centrale','',0],['Camelot teleport (tablet)','Château de Camelot (près de Seers\' Village)','',0],
+  ['Ardougne teleport (tablet)','East Ardougne, place du marché','Quête Plague City',0],['Watchtower teleport (tablet)','Watchtower (Yanille)','Quête Watchtower',0],
+  ['Teleport to house (tablet)','Ta maison (POH)','Une maison',0],['Kourend castle teleport (tablet)','Château de Kourend','',0],
+  ['Arceuus library teleport (tablet)','Bibliothèque d\'Arceuus','',0],['Draynor manor teleport (tablet)','Manoir de Draynor','',0],
+  ['Battlefront teleport (tablet)','Battlefront (ouest de Kourend)','',0],['Mind altar teleport (tablet)','Autel de l\'esprit (Mind altar)','',0],
+  ['Salve graveyard teleport (tablet)','Cimetière de la Salve (Morytania)','Accès Morytania (Priest in Peril)',0],
+  ['Fenkenstrain\'s castle teleport (tablet)','Château de Fenkenstrain (Morytania)','Accès Morytania (Priest in Peril)',0],
+  ['West ardougne teleport (tablet)','West Ardougne','Quête Biohazard',0],['Harmony island teleport (tablet)','Harmony Island','Quête The Great Brain Robbery',0],
+  ['Barrows teleport (tablet)','Barrows','Accès Morytania (Priest in Peril)',0],['Ape atoll teleport (tablet)','Ape Atoll','Monkey Madness I',0],
+  ['Cemetery teleport (tablet)','Forgotten Cemetery','',1],
+  ['Paddewwa teleport (tablet)','Edgeville Dungeon (Paddewwa)','',0],['Senntisten teleport (tablet)','Digsite (Senntisten)','',0],
+  ['Kharyrll teleport (tablet)','Canifis (Kharyrll)','Accès Morytania (Priest in Peril)',0],['Lassar teleport (tablet)','Ice Mountain (Lassar)','',0],
+  ['Dareeyak teleport (tablet)','Ruines de Dareeyak','',1],['Carrallanger teleport (tablet)','Graveyard of Shadows','',1],
+  ['Annakarl teleport (tablet)','Demonic Ruins','',1],['Ghorrock teleport (tablet)','Frozen Waste Plateau','',1],
+  ['Moonclan teleport (tablet)','Moonclan (Lunar Isle)','Lunar Diplomacy',0],['Ourania teleport (tablet)','Autel d\'Ourania (ZMI)','',0],
+  ['Waterbirth teleport (tablet)','Waterbirth Island','',0],['Barbarian teleport (tablet)','Barbarian Outpost','',0],
+  ['Khazard teleport (tablet)','Port Khazard','',0],['Fishing guild teleport (tablet)','Fishing Guild','',0],
+  ['Catherby teleport (tablet)','Catherby','',0],['Ice plateau teleport (tablet)','Ice Plateau','',1],
+  ['Nardah teleport','Nardah (désert)','',0],['Digsite teleport','Digsite','',0],['Feldip hills teleport','Feldip Hills','',0],
+  ['Lunar isle teleport','Lunar Isle','',0],['Mort\'ton teleport','Mort\'ton (Morytania)','Accès Morytania (Priest in Peril)',0],
+  ['Pest control teleport','Void Knights\' Outpost (Pest Control)','',0],['Piscatoris teleport','Piscatoris Fishing Colony','',0],
+  ['Tai bwo wannai teleport','Tai Bwo Wannai (Karamja)','',0],['Iorwerth camp teleport','Camp Iorwerth (Tirannwn)','Accès Tirannwn (Regicide)',0],
+  ['Mos le\'harmless teleport','Mos Le\'Harmless','Quête Cabin Fever',0],['Lumberyard teleport','Lumberyard (nord-est de Varrock)','',0],
+  ['Zul-andra teleport','Zul-Andra (Zulrah)','Quête Regicide',0],['Key master teleport','Key Master (Cerberus)','',0],
+  ['Watson teleport','Maison de Watson (Hosidius)','',0],['Civitas illa fortis teleport','Civitas illa Fortis (Varlamore)','',0],
+  ['Colossal wyrm teleport scroll','Parcours d\'agilité du Colossal Wyrm (Varlamore)','',0],['Spider cave teleport','Spider cave','',0],
+  ['Guthixian temple teleport','Temple guthixien','',0],['Chasm teleport scroll','Chasm','',0],['Ardeaglais teleport','Ardeaglais','',0],
+  ['Teleport to boat','Ton bateau (Sailing)','',0],['Revenant cave teleport','Revenant Caves','',1],['Wilderness crabs teleport','Crabes du Wilderness','',1]];
+/* Bijoux : [nom sans charge, destinations, Wilderness (au moins une destination)] */
+const JEWELS=[
+  ['Amulet of glory','Edgeville, Karamja, Draynor Village, Al Kharid',0],['Games necklace','Burthorpe, Barbarian Outpost, Corporeal Beast, Tears of Guthix, Wintertodt',0],
+  ['Ring of dueling','PvP Arena (Al Kharid), Castle Wars, Ferox Enclave, Fortis Colosseum',0],['Skills necklace','Guildes : pêche, minage, artisanat, cuisine, bûcheron, agriculture',0],
+  ['Combat bracelet','Warriors\' Guild, Champions\' Guild, Monastère d\'Edgeville, Ranging Guild',0],['Necklace of passage','Wizards\' Tower, The Outpost, Eagle\'s Eyrie (désert)',0],
+  ['Digsite pendant','Digsite, Fossil Island, Lithkren (selon tes quêtes)',0],['Ring of returning','Ton point de réapparition',0],
+  ['Slayer ring','Slayer Tower, Fremennik Slayer Dungeon, Tarn\'s Lair, Stronghold Slayer Cave, Dark Beasts',0],
+  ['Ring of wealth','Grand Exchange, Falador Park, Miscellania, Fremennik Docks',0],['Burning amulet','Chaos Temple, Bandit Camp, Lava Maze',1]];
+/* Coût en runes du sort équivalent (livre standard) */
+const TELE_RUNES={'Varrock teleport (tablet)':{Law:1,Air:3,Fire:1},'Lumbridge teleport (tablet)':{Law:1,Air:3,Earth:1},'Falador teleport (tablet)':{Law:1,Air:3,Water:1},
+  'Camelot teleport (tablet)':{Law:1,Air:5},'Ardougne teleport (tablet)':{Law:2,Water:2},'Watchtower teleport (tablet)':{Law:2,Earth:2},'Teleport to house (tablet)':{Law:1,Air:1,Earth:1}};
+const unitPrice=id=>{const p=buyRef(id);return p>0?p:null};
+function runeCost(rc){if(!rc)return null;let t=0;for(const k in rc){const id=BYNAME[(k+' rune').toLowerCase()];const p=id&&unitPrice(id);if(!p)return null;t+=p*rc[k]}return t}
+const fakeM=(name,mem=true)=>({name,icon:name+'.png',members:mem});
+function teleRows(){const rows=[];
+  TELES.forEach(([n,dest,req,wild])=>{if(wild&&!settings.teleWild)return;const id=BYNAME[n.toLowerCase()];
+    const b=id?base(id):{id:null,m:fakeM(n),name:n};const p=id?unitPrice(id):null;
+    rows.push(Object.assign({},b,{tKind:/\(tablet\)/.test(n)?'Tablette':n==='Teleport to boat'?'Objet':'Parchemin',tDest:dest,tReq:req,tWild:wild,tPer:p,tBest:'',tRunes:runeCost(TELE_RUNES[n])}))});
+  JEWELS.forEach(([n,dest,wild])=>{if(wild&&!settings.teleWild)return;let best=null,bestId=null,bestN=0,anyId=null;
+    for(let c=1;c<=8;c++){const id=BYNAME[(n+'('+c+')').toLowerCase()];if(!id)continue;anyId=anyId||id;const p=unitPrice(id);if(p&&(best==null||p/c<best)){best=p/c;bestId=id;bestN=c}}
+    const id=bestId||anyId;const b=id?base(id):{id:null,m:fakeM(n),name:n};
+    rows.push(Object.assign({},b,{name:n,tKind:'Bijou à charges',tDest:dest,tReq:'',tWild:wild,tPer:best,tBest:bestN?`le moins cher : (${bestN})`:'',tRunes:null}))});
+  return rows}
+
+/* Consommables : nourriture et boissons (page wiki « Food/All food »), potions (doses du GE) */
+let FOOD=store.get('food1',null);
+async function loadFood(){if(FOOD&&FOOD.t&&Date.now()-FOOD.t<7*864e5)return;
+  try{const r=await j(WIKI+'api.php?action=parse&format=json&origin=*&formatversion=2&prop=wikitext&page=Food/All_food');const w=r.parse.wikitext;
+    const unl=s=>String(s||'').replace(/<ref[^>]*>[\s\S]*?<\/ref>|<ref[^>]*\/>/g,'').replace(/\{\{SCP\|([^|}]+)\|([^|}]+)[^}]*\}\}/g,'$1 $2').replace(/\{\{(?:fact|NA)[^}]*\}\}/gi,'')
+      .replace(/\[\[([^\]|]*)\|([^\]]*)\]\]/g,'$2').replace(/\[\[([^\]]*)\]\]/g,'$1').replace(/<br\s*\/?>/g,' · ').replace(/<[^>]+>|'''?/g,'').replace(/\{\{[^}]*\}\}/g,'').replace(/\s+/g,' ').trim();
+    const L=[];w.split(/\n\|-/).forEach(b=>{const m=/\{\{plinkt\|([^}|]+)/.exec(b);if(!m)return;const c=b.split(/\n\|(?!-|\})/).slice(1);
+      const h=unl(String(c[1]||'').replace(/^[^|]*data-sort-value[^|]*\|/,'')).replace(/\s+-\s+/g,' – ');
+      let per=null,bites=1,x;const n=s=>+String(s).replace(/[^\d]/g,'');
+      if((x=/^(\d+)\s*[×x]\s*(\d+)$/.exec(h))){per=+x[1];bites=+x[2]}
+      else if((x=/^\((\d+)\s*[–-]\s*(\d+)\)\s*[×x]\s*(\d+)$/.exec(h))){per=+x[2];bites=+x[3]}
+      else if((x=/^(\d+)\s*[–-]\s*(\d+)$/.exec(h))){per=+x[2]}
+      else if((x=/^(\d+)\s*\+\s*(\d+)$/.exec(h))){per=+x[1]+ +x[2]}
+      else if((x=/^Up to (\d+)$/i.exec(h))){per=+x[1]}
+      else if(/^\d+$/.test(h))per=n(h);
+      L.push({n:m[1].trim(),h,per,bites,sk:unl(c[2]),note:unl(c[3]).slice(0,160),mem:!/No/.test(c[6]||'Yes')})});
+    if(L.length>50){FOOD={t:Date.now(),list:L};store.set('food1',FOOD)}
+  }catch(e){}}
+/* effets des potions, en français (clé = nom sans la dose, en minuscules) */
+const POT_FR={
+  'attack potion':'Attaque +3 +10 %','strength potion':'Force +3 +10 %','defence potion':'Défense +3 +10 %','combat potion':'Attaque et Force +3 +10 %',
+  'super attack':'Attaque +5 +15 %','super strength':'Force +5 +15 %','super defence':'Défense +5 +15 %','super combat potion':'Attaque, Force et Défense +5 +15 % (les trois super en une)',
+  'ranging potion':'Distance +4 +10 %','magic potion':'Magie +4','battlemage potion':'Magie +4 et Défense +5 +15 %','bastion potion':'Distance +4 +10 % et Défense +5 +15 %',
+  'restore potion':'Rend 10 + 30 % des stats baissées (pas les PV ni la Prière)','super restore':'Rend 8 + 25 % de toutes les stats baissées et de la Prière',
+  'blighted super restore':'Comme Super restore, utilisable seulement dans le Wilderness','prayer potion':'Rend 7 + 25 % des points de Prière',
+  'sanfew serum':'Comme Super restore, soigne en plus poison et maladie','prayer regeneration potion':'Régénère la Prière pendant 5 min',
+  'energy potion':'Énergie de course +10 %','super energy':'Énergie de course +20 %','stamina potion':'Énergie +20 %, et la course s\'use 70 % moins vite pendant 2 min',
+  'extended stamina potion':'Stamina qui dure plus longtemps','extreme energy potion':'Gros regain d\'énergie de course',
+  'antipoison':'Soigne le poison, immunité 90 s','superantipoison':'Soigne le poison, immunité 6 min','antidote+':'Soigne le poison, immunité 9 min','antidote++':'Soigne le poison, immunité 12 min',
+  'anti-venom':'Soigne venin et poison, courte immunité au venin','anti-venom+':'Soigne venin et poison, immunité au venin 3 min','extended anti-venom+':'Anti-venom+ qui dure plus longtemps',
+  'antifire potion':'Réduit les dégâts du souffle de dragon (6 min)','extended antifire':'Antifeu pendant 12 min','super antifire potion':'Immunité totale au souffle de dragon (3 min)','extended super antifire':'Immunité totale au souffle de dragon (6 min)',
+  'saradomin brew':'Soigne 15 % + 2 PV (peut dépasser ton max), Défense +20 % ; baisse Attaque, Force, Magie et Distance',
+  'zamorak brew':'Attaque +20 %, Force +12 %, Prière +10 % ; te retire des PV et baisse ta Défense','ancient brew':'Prière et Magie +, baisse Attaque, Force et Défense',
+  'forgotten brew':'Magie et Prière +, baisse Attaque, Force et Défense','armadyl brew':'Soigne comme un brew, et booste la Distance',
+  'guthix rest':'Soigne 5 PV (peut dépasser ton max), un peu d\'énergie, réduit le poison','menaphite remedy':'Remonte peu à peu tes stats baissées (6 min)',
+  'agility potion':'Agilité +3','fishing potion':'Pêche +3','super fishing potion':'Pêche boostée (plus que la potion normale)','hunter potion':'Chasse +3','super hunter potion':'Chasse boostée (plus que la potion normale)',
+  'serum 207':'Soigne la maladie de Mort\'ton','relicym\'s balm':'Soigne la maladie','guthix balance':'Affaiblit les vampyres, soigne le poison','compost potion':'Change le compost en supercompost (agriculture)',
+  'goading potion':'Les monstres t\'attaquent plus facilement (5 min)'};
+const MIX_OF={'superattack mix':'super attack','super str. mix':'super strength','super def. mix':'super defence','anti-poison supermix':'superantipoison','hunting mix':'hunter potion',
+  'magic essence mix':'','antifire mix':'antifire potion','extended antifire mix':'extended antifire','super antifire mix':'super antifire potion','extended super antifire mix':'extended super antifire','antidote+ mix':'antidote+','antipoison mix':'antipoison'};
+const DIVINE=/^divine (.*)$/;
+function potEffect(k){if(POT_FR[k])return POT_FR[k];
+  const d=DIVINE.exec(k);if(d){const b=d[1].replace(/ potion$/,'');const e=POT_FR[b]||POT_FR[b+' potion'];return (e||'Boost')+' — reste au maximum 5 min sans redescendre (coûte 10 PV)'}
+  if(/ mix$/.test(k)){const b=MIX_OF[k]!=null?MIX_OF[k]:k.replace(/ mix$/,' potion');const e=POT_FR[b]||POT_FR[k.replace(/ mix$/,'')];return (e?e+' ; ':'')+'mix barbare : 2 doses, et chaque dose soigne aussi quelques PV'}
+  return null}
+const DRINK=/\b(ale|beer|wine|tea|cocktail|blast|punch|rum|whisky|cider|brandy|vodka|gin|stout|mead|juice|milk|bitter|slayer's respite|sq'irkjuice|grog|tonic|chocolate)\b/i;
+function consRows(){const rows=[],seen=new Set(),foodBy={};
+  ((FOOD&&FOOD.list)||[]).forEach(f=>{foodBy[f.n.toLowerCase()]=f});
+  // potions : regroupées par nom, prix par dose = format le moins cher
+  const G={};for(const id in MAP){const m=MAP[id];const x=/^(.*?)\s*\(([1-4])\)$/.exec(m.name);if(!x)continue;const k=x[1].toLowerCase();
+    if(/oil$/.test(k))continue;if(!(POT_FR[k]||potEffect(k)||/dose|potion|brew|mix|serum|antidote|antivenom|elixir/i.test((m.examine||'')+' '+k)))continue;
+    if(/necklace|amulet|ring|bracelet|pendant|glory|cape|jar|sack|book|bag|vial of/i.test(k))continue;
+    (G[k]=G[k]||{name:x[1],doses:[]}).doses.push({id:+id,n:+x[2]})}
+  for(const k in G){const g=G[k];let best=null,bId=null,bN=0;g.doses.forEach(d=>{const p=unitPrice(d.id);if(p&&(best==null||p/d.n<best)){best=p/d.n;bId=d.id;bN=d.n}});
+    const ref=bId||(g.doses.find(d=>d.n===4)||g.doses.sort((a,b)=>b.n-a.n)[0]).id;const f=foodBy[k];seen.add(k);
+    const per=f&&f.per?f.per:null;const eff=potEffect(k);
+    rows.push(Object.assign({},base(ref),{name:g.name,cKind:'Potion',cEff:eff||(MAP[ref].examine||''),cEn:!eff,cHeal:per,cHealTxt:f?f.h+(f.bites>1?' (par dose : '+f.per+')':''):'',cUnit:best,cBest:bN?`dose la moins chère : (${bN})`:'',cHp:best&&per?best/per:null,cNote:''}))}
+  // nourriture et boissons
+  ((FOOD&&FOOD.list)||[]).forEach(f=>{const k=f.n.toLowerCase();if(seen.has(k))return;seen.add(k);
+    const id=BYNAME[k]||null;const tot=f.per!=null?f.per*f.bites:null;const p=id?unitPrice(id):null;
+    const b=id?base(id):{id:null,m:fakeM(f.n,f.mem),name:f.n};
+    rows.push(Object.assign({},b,{cKind:DRINK.test(f.n)?'Boisson':'Nourriture',cEff:tot!=null?`Soigne ${tot} PV`+(f.bites>1?` en ${f.bites} bouchées`:''):f.h?`Soigne ${f.h} PV`:'',cEn:false,
+      cHeal:tot,cHealTxt:f.h,cUnit:p,cBest:'',cHp:p&&tot?p/tot:null,cNote:f.note,cSk:f.sk}))});
+  const K=settings.consKind;return rows.filter(r=>K==='all'||(K==='food'?r.cKind!=='Potion':r.cKind==='Potion'))}
+
 /* ---------- views ---------- */
 const COLS={
   item:{h:'Objet',l:1,v:r=>r.name,f:r=>itemCell(r)},
+  tKind:{h:'Type',l:1,v:r=>r.tKind,f:r=>esc(r.tKind)},
+  tDest:{h:'Destination',l:1,v:r=>r.tDest,f:r=>`${r.tWild?'<span class="pill warn" title="Wilderness : risque de mort (Hardcore)">☠ Wilderness</span> ':''}${esc(r.tDest)}`},
+  tReq:{h:'Prérequis',l:1,v:r=>r.tReq||'',f:r=>r.tReq?esc(r.tReq):'<span class="mut">–</span>',t:'Prérequis connus. Vérifie sur le wiki en cas de doute.'},
+  tPer:{h:'Prix / téléport',v:r=>r.tPer,f:r=>r.tPer!=null?gpc(r.tPer)+(r.tBest?`<div class="mut" style="font-size:11px">${r.tBest}</div>`:''):'<span class="mut">N/A</span>',t:'Achat rapide au GE. Bijoux : prix divisé par le nombre de charges, avec le format le moins cher.'},
+  tRunes:{h:'Sort (runes)',v:r=>r.tRunes,f:r=>r.tRunes!=null?`${gp(r.tRunes)}${r.tPer!=null?` <span class="${r.tRunes<r.tPer?'up':'mut'}" title="${r.tRunes<r.tPer?'Lancer le sort coûte moins cher que la tablette':'La tablette coûte moins cher que les runes'}">${r.tRunes<r.tPer?'◀ sort moins cher':''}</span>`:''}`:'<span class="mut">–</span>',t:'Prix des runes pour lancer le même sort (livre standard)'},
+  cKind:{h:'Type',l:1,v:r=>r.cKind,f:r=>esc(r.cKind)},
+  cEff:{h:'Ce que ça fait',l:1,v:r=>r.cEff||'',f:r=>`${r.cEff?`<span${r.cEn?' class="mut" title="Texte du jeu (anglais)"':''}>${esc(r.cEff)}</span>`:'<span class="mut">N/A</span>'}${r.cNote?`<div class="mut" style="font-size:11px" title="Note du wiki">${esc(r.cNote)}</div>`:''}`},
+  cHeal:{h:'PV soignés',v:r=>r.cHeal,f:r=>r.cHeal!=null?`<b>${r.cHeal}</b>${r.cHealTxt&&String(r.cHealTxt)!==String(r.cHeal)?`<div class="mut" style="font-size:11px">${esc(r.cHealTxt)}</div>`:''}`:(r.cHealTxt?`<span class="mut">${esc(r.cHealTxt)}</span>`:'<span class="mut">–</span>'),t:'Total par objet (toutes les bouchées), ou par dose pour les potions. Les brews et l\'anglerfish dépendent de tes PV : valeur affichée à 99 PV.'},
+  cUnit:{h:'Prix / unité ou dose',v:r=>r.cUnit,f:r=>r.cUnit!=null?gpc(r.cUnit)+(r.cBest?`<div class="mut" style="font-size:11px">${r.cBest}</div>`:''):'<span class="mut">N/A</span>',t:'Achat rapide au GE. Potions : prix d\'une dose, avec le format le moins cher.'},
+  cHp:{h:'gp par PV',v:r=>r.cHp,f:r=>r.cHp!=null?`<b>${r.cHp<10?r.cHp.toFixed(1).replace('.',','):gp(r.cHp)}</b>`:'<span class="mut">N/A</span>',t:'Prix payé pour soigner 1 PV : plus c\'est bas, plus la nourriture est économique'},
   buy:{h:'Achat',v:r=>r.buy,f:r=>gpc(r.buy),t:'Dernier prix de vente instantanée (ce que tu paies en offre basse)'},
   sell:{h:'Vente',v:r=>r.sell,f:r=>gpc(r.sell),t:'Dernier prix d\'achat instantané (ce que tu obtiens en offre haute)'},
   margin:{h:'Marge',v:r=>r.margin,f:r=>`<span class="${cls(r.margin)}">${gp(r.margin)}</span>`},
@@ -1056,6 +1187,10 @@ VIEWS.instant={label:'Achat immédiat ⚡',intro:'Ce qui vaut la peine d\'être 
   cols:['item','use','mv','ip','iunit','ilot','ibudget','ilp','v24'],sort:['ilp',-1],rows:()=>instantRows(),filters:['instMin']};
 VIEWS.sets={label:'Ensembles',intro:'Les ensembles (armures, peaux de dragon, Barrows…) s\'assemblent et se défont gratuitement auprès d\'un employé du GE. « Assembler » : acheter les pièces et revendre l\'ensemble ; « Défaire » : l\'inverse. Attention, sur les Hardcore Worlds les ensembles s\'échangent très peu : regarde « Ensembles / 24 h » avant d\'en acheter. « Sortie de secours » = ce que tu perds si tu dois tout redéfaire et revendre les pièces.',
   cols:['item','setC','setPb','setSell','asm','spl','setV','pcV','unwind','limit'],sort:['best',-1],rows:()=>setRows()};
+VIEWS.tele={label:'Téléportations 🌀',intro:'Toutes les tablettes, tous les parchemins de téléportation et les bijoux à charges, avec leur destination et le prix d\'un téléport au GE. Pour les bijoux, le prix est divisé par les charges (le format le moins cher est indiqué). « Sort (runes) » : ce que coûte le même sort en runes, pour savoir si la tablette vaut le coup.',
+  cols:['item','tKind','tDest','tReq','tPer','tRunes','v24','last'],sort:['tPer',1],rows:()=>teleRows(),filters:['teleWild'],noNoise:true};
+VIEWS.cons={label:'Consommables 🍖',intro:()=>`Nourriture, boissons et potions : ce que ça fait, combien de PV ça soigne et le prix d'une unité (ou d'une dose) au GE. « gp par PV » = le prix pour soigner 1 point de vie : trie sur cette colonne pour trouver la nourriture la plus économique.${FOOD?'':' Les soins de la nourriture se chargent depuis le wiki…'}`,
+  cols:['item','cKind','cEff','cHeal','cUnit','cHp','v24','last'],sort:['cHp',1],rows:()=>consRows(),filters:['consKind'],noNoise:true};
 VIEWS.prog={label:'Progression & XP',custom:true,render:()=>renderProg()};
 VIEWS.advice={label:'Conseils 💰',custom:true,render:()=>renderAdvice()};
 VIEWS.night={label:'Ordres de nuit 🌙',custom:true,render:()=>renderNight()};
@@ -1065,7 +1200,7 @@ VIEWS.home={label:'Accueil',custom:true,render:()=>renderHome()};
 VIEWS.tour={label:'Tournée PNJ 🔁',custom:true,render:()=>renderTour()};
 VIEWS.runes={label:'Runes en magasin 🔮',custom:true,render:()=>renderRunes()};
 VIEWS.offcuts={label:'Fish offcuts 🐟',custom:true,render:()=>renderOffcuts()};
-{const order=['home','advice','night','instant','prog','flips','big','hits','favs','all','tour','dir','resell','ward','sticks','runes','epic','shops','packs','sets','alch','craft','offcuts','ship','cross','transfer','alerts'];const tmp={};order.forEach(k=>tmp[k]=VIEWS[k]);Object.keys(VIEWS).forEach(k=>delete VIEWS[k]);Object.assign(VIEWS,tmp)}
+{const order=['home','advice','night','instant','prog','flips','big','hits','favs','all','tour','dir','resell','ward','sticks','runes','epic','shops','packs','sets','alch','craft','offcuts','ship','tele','cons','cross','transfer','alerts'];const tmp={};order.forEach(k=>tmp[k]=VIEWS[k]);Object.keys(VIEWS).forEach(k=>delete VIEWS[k]);Object.assign(VIEWS,tmp)}
 const FILTERS={dirMode:null,wardAll:null,chSafeOnly:null,instMin:['Profit min par lot (gp)',500],minVol:['Volume min (24 h, côté le plus faible)',1],minPct:['Marge min %',.1],hitPct:['Variation min %',1],hitVol:['Volume min (1 h)',1],bigTrades:['Échanges min / 24 h',1],bigPct:['Écart min %',1],bigGp:['Écart min (gp)',1000],bigAge:['Derniers trades de moins de (h)',1]};
 
 function suspect(r){if(r.dev==null||r.vmin24==null)return '';const why=[];
@@ -1079,8 +1214,8 @@ function itemCell(r){
 
 /* ---------- navigation par thèmes : chaque onglet dit quel mouvement il propose ---------- */
 const GROUPS=[['home','🏠 Accueil',['home']],['plan','🧭 Mon plan',['advice','night','instant','prog']],['ge','📈 Bourse (GE)',['flips','big','hits','favs','all']],
-  ['npc','🏪 PNJ & magasins',['tour','dir','resell','ward','sticks','runes','epic','shops','packs','sets']],['make','⚗️ Transformer',['alch','craft','offcuts','ship']],...(WORLD==='osrs'?[]:[['hc','🌍 HC → OSRS',['cross','transfer']]]),['alerts','🔔 Alertes',['alerts']],['admin','🛠️ Atelier',['atelier']]];
-const MOVES={tour:['📈 Offres basses au GE','🏪 Vends 1 de chaque au PNJ','🔁 Change de monde'],runes:['🏪 Achète au PNJ','💰 Économise sur le GE'],offcuts:['🏪 Poissons chez Frankie','🔪 Coupe sur place','📈 Revends les offcuts'],sticks:['📈 Achète des opales au GE','💎 Vends-les à Gabooty (Tai Bwo Wannai) contre des sticks','🌴 Machette, gout tuber ou sticks à revendre'],ship:['⛵ Choisis tes pièces','🛒 Offres basses au GE (ou PNJ moins cher)','🔨 Construis au chantier'],night:['🌙 Offres d\'achat basses au GE avant de dormir','☀️ Le matin, récupère','🏪 Revends au PNJ (change de monde)'],advice:['💰 Ton capital','🛒 Liste de courses, du plus sûr au plus risqué'],instant:['⚡ Achète tout de suite au GE','🛠️ PNJ, alch, craft, pack ou ensemble','💰 Profit immédiat'],
+  ['npc','🏪 PNJ & magasins',['tour','dir','resell','ward','sticks','runes','epic','shops','packs','sets']],['make','⚗️ Transformer',['alch','craft','offcuts','ship']],['use','🎒 Utiles',['tele','cons']],...(WORLD==='osrs'?[]:[['hc','🌍 HC → OSRS',['cross','transfer']]]),['alerts','🔔 Alertes',['alerts']],['admin','🛠️ Atelier',['atelier']]];
+const MOVES={tele:['🌀 Choisis ta destination','📈 Achète le téléport le moins cher'],cons:['🍖 Compare les soins','💰 Prends le moins cher par PV'],tour:['📈 Offres basses au GE','🏪 Vends 1 de chaque au PNJ','🔁 Change de monde'],runes:['🏪 Achète au PNJ','💰 Économise sur le GE'],offcuts:['🏪 Poissons chez Frankie','🔪 Coupe sur place','📈 Revends les offcuts'],sticks:['📈 Achète des opales au GE','💎 Vends-les à Gabooty (Tai Bwo Wannai) contre des sticks','🌴 Machette, gout tuber ou sticks à revendre'],ship:['⛵ Choisis tes pièces','🛒 Offres basses au GE (ou PNJ moins cher)','🔨 Construis au chantier'],night:['🌙 Offres d\'achat basses au GE avant de dormir','☀️ Le matin, récupère','🏪 Revends au PNJ (change de monde)'],advice:['💰 Ton capital','🛒 Liste de courses, du plus sûr au plus risqué'],instant:['⚡ Achète tout de suite au GE','🛠️ PNJ, alch, craft, pack ou ensemble','💰 Profit immédiat'],
   prog:['🎯 Ton niveau','📚 La méthode la moins chère','🗺️ Ton plan d\'XP'],
   flips:['📈 Offre d\'achat basse au GE','⏳ Attends qu\'elle se remplisse','📈 Revends plus haut au GE'],big:['📈 Offre d\'achat basse','⏳ Patience (peu d\'échanges)','📈 Revends avec un gros écart'],
   hits:['👀 Repère une forte hausse ou chute','📈 Achète ou vends au bon moment'],favs:['★ Tes objets suivis','⏱️ Prix en direct'],all:['🔎 Tous les objets du GE HC'],
@@ -1112,6 +1247,10 @@ function render(){
       ?`<label>Rentable même avec <select id="f_epK" data-fsn="epK">${[10,50,200,1000].map(n=>`<option value="${n}" ${settings.epK==n?'selected':''}>${n} en trop</option>`).join('')}</select> dans le magasin</label> <label><input type="checkbox" data-fc="epGen" ${settings.epGen?'checked':''}> Inclure les magasins généraux</label>`
       :f==='dirMode'
       ?`<label>Afficher <select data-fs="dirMode"><option value="item" ${settings.dirMode!=='shop'?'selected':''}>Par objet</option><option value="shop" ${settings.dirMode==='shop'?'selected':''}>Par marchand</option></select></label>`
+      :f==='teleWild'
+      ?`<label><input type="checkbox" data-fc="teleWild" ${settings.teleWild?'checked':''}> Montrer aussi les téléports vers le Wilderness ☠</label>`
+      :f==='consKind'
+      ?`<label>Afficher <select data-fs="consKind">${[['all','Tout'],['food','Nourriture et boissons'],['pot','Potions']].map(([v,t])=>`<option value="${v}" ${settings.consKind===v?'selected':''}>${t}</option>`).join('')}</select></label>`
       :f==='wardAll'
       ?`<label><input type="checkbox" data-fc="wardAll" ${settings.wardAll?'checked':''}> Afficher aussi les objets non rentables (liste complète)</label>`
       :f==='chSafeOnly'
@@ -1921,6 +2060,9 @@ function setLive(sec){liveSec=+sec;store.set('liveSec',liveSec);clearInterval(li
 function favRows(){const ids=[...favs].filter(id=>MAP[id]);hcwWant(ids);wantSpark(ids);return ids.map(id=>base(id))}
 
 const CHANGELOG=`<div class="dh"><h2>Nouveautés</h2><button class="btn" id="close">Fermer</button></div>
+ <div class="box"><h3>v1.2 « Utiles » · 17 novembre 2026</h3><ul class="list">
+  <li><span><b>🌀 Téléportations</b> (groupe 🎒 Utiles) : toutes les tablettes, tous les parchemins et les bijoux à charges, avec destination, prérequis connus, prix d'un téléport et coût du même sort en runes. Le Wilderness est masqué par défaut.</span></li>
+  <li><span><b>🍖 Consommables</b> : nourriture, boissons et potions, ce qu'elles font (en français pour les potions), PV soignés, prix par unité ou par dose et <b>gp par PV</b>.</span></li></ul></div>
  <div class="box"><h3>v1.1 « Atelier » · 17 novembre 2026</h3><ul class="list">
   <li><span><b>🛠️ Atelier</b> (barre latérale, menu ⚙ ou Ctrl+K) : affiche ou masque les modules, règle tout l'outil au même endroit avec ↺ pour revenir à l'origine, recharge les magasins ou les accès PNJ, et note tes idées pour les prochaines versions (bouton « Copier tout » pour Claude).</span></li>
   <li><span>Modules masqués et idées sont inclus dans 💾 Mes données.</span></li>
@@ -2220,7 +2362,7 @@ document.addEventListener('click',e=>{
   const th=e.target.closest('th[data-sort]');if(th){const k=th.dataset.sort;const cur=sortState[tab]||VIEWS[tab].sort;sortState[tab]=[k,cur[0]===k?-cur[1]:-1];store.set('sort',sortState);render();return}
   const rt=e.target.closest('tr[data-rec],li[data-rec],tr[data-pk]');if(rt&&!e.target.closest('button,input,a')){if(rt.dataset.rec!=null&&rt.dataset.rec!=='undefined'){showRecipe(RECIPES[+rt.dataset.rec]);return}if(rt.dataset.pk!=null){showPack(PACKS_DATA[+rt.dataset.pk]);return}}
   const ir=e.target.closest('[data-item]');if(ir){openItem(ir.dataset.item);return}
-  const tr=e.target.closest('tbody tr[data-id]');if(tr){openItem(tr.dataset.id);return}
+  const tr=e.target.closest('tbody tr[data-id]');if(tr){if(MAP[tr.dataset.id])openItem(tr.dataset.id);return}
   const lk=e.target.closest('[data-look]');if(lk){curLook=lk.dataset.look;store.set('look',curLook);document.querySelectorAll('[data-look]').forEach(b=>b.classList.toggle('on',b===lk));drawChart();return}
   if(e.target.id==='close'||e.target.id==='scrim'){closeItem();return}
   if(e.target.id==='qcalc'){queueCalc();return}
@@ -2279,6 +2421,7 @@ function modHidden(t){return hiddenMods.has(t)&&!ATL_KEEP.has(t)}
 let ideas=store.get('ideas',[]);
 /* clé : [section, libellé, unité ou liste de choix] — les clés absentes vont dans « Autres » */
 const SET_INFO={
+  teleWild:['Utiles','Téléportations : montrer celles du Wilderness'],consKind:['Utiles','Consommables : type affiché',{all:'tout',food:'nourriture et boissons',pot:'potions'}],
   minVol:['Flips','Volume min 24 h (côté le plus faible)'],minPct:['Flips','Marge min','%'],
   hitOn:['Gros mouvements & alertes','Me prévenir des gros mouvements'],hitScope:['Gros mouvements & alertes','Surveiller',{all:'tous les objets',favs:'mes favoris seulement'}],
   hitPct:['Gros mouvements & alertes','Variation min (1 h / 24 h)','%'],hitVol:['Gros mouvements & alertes','Volume min sur 1 h'],
@@ -2386,7 +2529,7 @@ if(store.get('mute',false)&&store.get('sound',null)==null)store.set('sound','off
 setInterval(()=>{tickStatus();const ls=$('#liveSt');if(ls&&liveAt)ls.textContent='dernier relevé il y a '+ago(liveAt/1000)},5000);
 
 (async()=>{
-  try{await loadStatic();await loadPrices();render();tickStatus();checkAlerts();setAuto($('#auto').value);trackMoves([...favs].filter(id=>MAP[id]));setLive(liveSec)}
+  try{await loadStatic();await loadPrices();render();loadFood().then(()=>{if(tab==='cons')render()});tickStatus();checkAlerts();setAuto($('#auto').value);trackMoves([...favs].filter(id=>MAP[id]));setLive(liveSec)}
   catch(e){showErr('Chargement impossible ('+e.message+'). Ouvre ce fichier dans un navigateur connecté à internet (Chrome, Firefox, Edge).');$('#status').textContent='Hors ligne'}
 })();
 </script>
