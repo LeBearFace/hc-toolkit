@@ -2603,9 +2603,11 @@ function eqLv(s){const o=eqSt.o.lv;return o&&o[s]!=null?o[s]:(plvl(s)||(s==='Hit
 const EQ_AB={a:'Attack',s:'Strength',d:'Defence',r:'Ranged',m:'Magic',p:'Prayer',h:'Hitpoints',sl:'Slayer',ag:'Agility'};
 /* objets récents absents de la base (vérifiés à la main) */
 const EQ_REQ_FIX=[[/^Masori (mask|body|chaps) \(f\)/,'r80 d80'],[/^Masori (mask|body|chaps)/,'r80 d30'],[/^Torva (full helm|platebody|platelegs)/,'d80'],[/^Zaryte crossbow/,'r80'],[/^Zaryte vambraces/,'r80 d45'],
-  [/^Osmumten's fang/,'a82'],[/^Venator bow/,'r80'],[/^Scythe of vitur/,'a80 s90'],[/^Blade of saeldor/,'a75'],[/^Bow of faerdhinen/,'r80 ag70'],[/^Tonalztics of ralos/,'r75']];
+  [/^Osmumten's fang/,'a82'],[/^Zombie axe/,'a65'],[/^Venator bow/,'r80'],[/^Scythe of vitur/,'a80 s90'],[/^Blade of saeldor/,'a75'],[/^Bow of faerdhinen/,'r80 ag70'],[/^Tonalztics of ralos/,'r75']];
 function eqReq(it){let raw=EQ_REQ[it.n];if(raw==null){const f=EQ_REQ_FIX.find(x=>x[0].test(it.n));if(f)raw=f[1]}
-  if(raw==null){if(it.id>EQ_REQ_MAXID||EQ_REQ_UNK.has(it.n))return {ok:null,txt:'N/A',miss:[],need:{}};return {ok:true,txt:'aucun',miss:[],need:{}}}
+  /* la base dit « aucun » pour certains objets récents qui en ont : un objet récent et puissant sans prérequis connu passe en N/A */
+  const strong=Math.max(...it.o,...it.d)>=15||it.str>=8||it.rs>=8;
+  if(raw==null){if(it.id>EQ_REQ_MAXID||EQ_REQ_UNK.has(it.n)||it.id>20000&&strong)return {ok:null,txt:'N/A',miss:[],need:{}};return {ok:true,txt:'aucun',miss:[],need:{}}}
   const need={},miss=[];raw.split(' ').forEach(p=>{const m=/^([a-z]+)(\d+)$/.exec(p);if(!m)return;let sk=EQ_AB[m[1]]||(m[1][0].toUpperCase()+m[1].slice(1));
     if(sk==='Cb'||sk==='Combat')return;if(sk==='Runecraft'||sk==='Runecrafting')sk='Runecraft';need[sk]=+m[2];const have=EQ_LVS.includes(sk)?eqLv(sk):plvl(sk);if(have<+m[2])miss.push([sk,+m[2],+m[2]-have])});
   return {ok:!miss.length,miss,need,txt:Object.entries(need).map(([k,v])=>v+' '+(SKFR[k]||k).slice(0,3)).join(', ')}}
