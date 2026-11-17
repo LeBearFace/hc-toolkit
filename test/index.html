@@ -929,16 +929,21 @@ const JEWELS=[
 const TELE_RUNES={'Varrock teleport (tablet)':{Law:1,Air:3,Fire:1},'Lumbridge teleport (tablet)':{Law:1,Air:3,Earth:1},'Falador teleport (tablet)':{Law:1,Air:3,Water:1},
   'Camelot teleport (tablet)':{Law:1,Air:5},'Ardougne teleport (tablet)':{Law:2,Water:2},'Watchtower teleport (tablet)':{Law:2,Earth:2},'Teleport to house (tablet)':{Law:1,Air:1,Earth:1}};
 const unitPrice=id=>{const p=buyRef(id);return p>0?p:null};
+/* 1.2 : prix par dose ou par charge : le format le moins cher parmi ceux vraiment achetés (≥ 5 achats / 24 h) ;
+   sinon le format le plus échangé (un vieux trade isolé à 18 gp ne fait pas foi) */
+function perUnit(list){const ok=list.map(x=>Object.assign({p:unitPrice(x.id),hv:(D24[x.id]||{}).highPriceVolume||0,v:base(x.id).v24},x)).filter(x=>x.p);
+  if(!ok.length)return null;const liq=ok.filter(x=>x.hv>=5);const pool=liq.length?liq:[ok.sort((a,b)=>b.v-a.v)[0]];
+  const b=pool.reduce((a,x)=>!a||x.p/x.n<a.p/a.n?x:a,null);return {per:b.p/b.n,id:b.id,n:b.n,thin:!liq.length}}
 function runeCost(rc){if(!rc)return null;let t=0;for(const k in rc){const id=BYNAME[(k+' rune').toLowerCase()];const p=id&&unitPrice(id);if(!p)return null;t+=p*rc[k]}return t}
 const fakeM=(name,mem=true)=>({name,icon:name+'.png',members:mem});
 function teleRows(){const rows=[];
   TELES.forEach(([n,dest,req,wild])=>{if(wild&&!settings.teleWild)return;const id=BYNAME[n.toLowerCase()];
     const b=id?base(id):{id:null,m:fakeM(n),name:n};const p=id?unitPrice(id):null;
     rows.push(Object.assign({},b,{tKind:/\(tablet\)/.test(n)?'Tablette':n==='Teleport to boat'?'Objet':'Parchemin',tDest:dest,tReq:req,tWild:wild,tPer:p,tBest:'',tRunes:runeCost(TELE_RUNES[n])}))});
-  JEWELS.forEach(([n,dest,wild])=>{if(wild&&!settings.teleWild)return;let best=null,bestId=null,bestN=0,anyId=null;
-    for(let c=1;c<=8;c++){const id=BYNAME[(n+'('+c+')').toLowerCase()];if(!id)continue;anyId=anyId||id;const p=unitPrice(id);if(p&&(best==null||p/c<best)){best=p/c;bestId=id;bestN=c}}
-    const id=bestId||anyId;const b=id?base(id):{id:null,m:fakeM(n),name:n};
-    rows.push(Object.assign({},b,{name:n,tKind:'Bijou à charges',tDest:dest,tReq:'',tWild:wild,tPer:best,tBest:bestN?`le moins cher : (${bestN})`:'',tRunes:null}))});
+  JEWELS.forEach(([n,dest,wild])=>{if(wild&&!settings.teleWild)return;const L=[];
+    for(let c=1;c<=8;c++){const id=BYNAME[(n+'('+c+')').toLowerCase()]||BYNAME[(n+' ('+c+')').toLowerCase()];if(id)L.push({id,n:c})}
+    const pu=perUnit(L);const best=pu?pu.per:null,bestN=pu?pu.n:0;const id=pu?pu.id:L.length?L[L.length-1].id:null;const b=id?base(id):{id:null,m:fakeM(n),name:n};
+    rows.push(Object.assign({},b,{name:n,tKind:'Bijou à charges',tDest:dest,tReq:'',tWild:wild,tPer:best,tBest:bestN?`le moins cher : (${bestN})${pu.thin?' · peu échangé':''}`:'',tRunes:null}))});
   return rows}
 
 /* Consommables : nourriture et boissons (page wiki « Food/All food »), potions (doses du GE) */
@@ -978,7 +983,7 @@ const POT_FR={
   'guthix rest':'Soigne 5 PV (peut dépasser ton max), un peu d\'énergie, réduit le poison','menaphite remedy':'Remonte peu à peu tes stats baissées (6 min)',
   'agility potion':'Agilité +3','fishing potion':'Pêche +3','super fishing potion':'Pêche boostée (plus que la potion normale)','hunter potion':'Chasse +3','super hunter potion':'Chasse boostée (plus que la potion normale)',
   'serum 207':'Soigne la maladie de Mort\'ton','relicym\'s balm':'Soigne la maladie','guthix balance':'Affaiblit les vampyres, soigne le poison','compost potion':'Change le compost en supercompost (agriculture)',
-  'goading potion':'Les monstres t\'attaquent plus facilement (5 min)'};
+  'goading potion':'Les monstres t\'attaquent plus facilement (5 min)','anti-poison supermix':'Comme Superantipoison ; mix barbare : 2 doses, et chaque dose soigne aussi quelques PV'};
 const MIX_OF={'superattack mix':'super attack','super str. mix':'super strength','super def. mix':'super defence','anti-poison supermix':'superantipoison','hunting mix':'hunter potion',
   'magic essence mix':'','antifire mix':'antifire potion','extended antifire mix':'extended antifire','super antifire mix':'super antifire potion','extended super antifire mix':'extended super antifire','antidote+ mix':'antidote+','antipoison mix':'antipoison'};
 const DIVINE=/^divine (.*)$/;
@@ -988,18 +993,18 @@ function potEffect(k){if(POT_FR[k])return POT_FR[k];
   return null}
 const DRINK=/\b(ale|beer|wine|tea|cocktail|blast|punch|rum|whisky|cider|brandy|vodka|gin|stout|mead|juice|milk|bitter|slayer's respite|sq'irkjuice|grog|tonic|chocolate)\b/i;
 function consRows(){const rows=[],seen=new Set(),foodBy={};
-  ((FOOD&&FOOD.list)||[]).forEach(f=>{foodBy[f.n.toLowerCase()]=f});
+  ((FOOD&&FOOD.list)||[]).forEach(f=>{const k=f.n.toLowerCase().replace(/\s*\(\d\)$/,'');if(!foodBy[k]||/\(\d\)$/.test(f.n))foodBy[k]=f});
   // potions : regroupées par nom, prix par dose = format le moins cher
   const G={};for(const id in MAP){const m=MAP[id];const x=/^(.*?)\s*\(([1-4])\)$/.exec(m.name);if(!x)continue;const k=x[1].toLowerCase();
     if(/oil$/.test(k))continue;if(!(POT_FR[k]||potEffect(k)||/dose|potion|brew|mix|serum|antidote|antivenom|elixir/i.test((m.examine||'')+' '+k)))continue;
     if(/necklace|amulet|ring|bracelet|pendant|glory|cape|jar|sack|book|bag|vial of/i.test(k))continue;
     (G[k]=G[k]||{name:x[1],doses:[]}).doses.push({id:+id,n:+x[2]})}
-  for(const k in G){const g=G[k];let best=null,bId=null,bN=0;g.doses.forEach(d=>{const p=unitPrice(d.id);if(p&&(best==null||p/d.n<best)){best=p/d.n;bId=d.id;bN=d.n}});
+  for(const k in G){const g=G[k];const pu=perUnit(g.doses);const best=pu?pu.per:null,bId=pu?pu.id:null,bN=pu?pu.n:0;
     const ref=bId||(g.doses.find(d=>d.n===4)||g.doses.sort((a,b)=>b.n-a.n)[0]).id;const f=foodBy[k];seen.add(k);
     const per=f&&f.per?f.per:null;const eff=potEffect(k);
-    rows.push(Object.assign({},base(ref),{name:g.name,cKind:'Potion',cEff:eff||(MAP[ref].examine||''),cEn:!eff,cHeal:per,cHealTxt:f?f.h+(f.bites>1?' (par dose : '+f.per+')':''):'',cUnit:best,cBest:bN?`dose la moins chère : (${bN})`:'',cHp:best&&per?best/per:null,cNote:''}))}
+    rows.push(Object.assign({},base(ref),{name:g.name,cKind:'Potion',cEff:eff||(MAP[ref].examine||''),cEn:!eff,cHeal:per,cHealTxt:f?f.h+(f.bites>1?' (par dose : '+f.per+')':''):'',cUnit:best,cBest:bN?`dose la moins chère : (${bN})${pu.thin?' · peu échangé':''}`:'',cHp:best&&per?best/per:null,cNote:''}))}
   // nourriture et boissons
-  ((FOOD&&FOOD.list)||[]).forEach(f=>{const k=f.n.toLowerCase();if(seen.has(k))return;seen.add(k);
+  ((FOOD&&FOOD.list)||[]).forEach(f=>{const k=f.n.toLowerCase();if(seen.has(k)||seen.has(k.replace(/\s*\(\d\)$/,'')))return;seen.add(k);
     const id=BYNAME[k]||null;const tot=f.per!=null?f.per*f.bites:null;const p=id?unitPrice(id):null;
     const b=id?base(id):{id:null,m:fakeM(f.n,f.mem),name:f.n};
     rows.push(Object.assign({},b,{cKind:DRINK.test(f.n)?'Boisson':'Nourriture',cEff:tot!=null?`Soigne ${tot} PV`+(f.bites>1?` en ${f.bites} bouchées`:''):f.h?`Soigne ${f.h} PV`:'',cEn:false,
