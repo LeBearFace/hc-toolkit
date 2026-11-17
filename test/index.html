@@ -597,6 +597,8 @@ function base(id){
   if(hL&&hH&&m24)chg=(m1-m24)/m24*100;
   else if(hL&&d.avgLowPrice)chg=(hL-d.avgLowPrice)/d.avgLowPrice*100;
   else if(hH&&d.avgHighPrice)chg=(hH-d.avgHighPrice)/d.avgHighPrice*100;
+  // moins d'1 gp d'écart (objets à 1-5 gp) : pas un vrai mouvement
+  if(chg!=null){const ref=hL&&hH?m24:hL?d.avgLowPrice:d.avgHighPrice;if(Math.abs(chg/100*ref)<1)chg=0}
   return{id:+id,m,name:m.name,buy,sell,margin,mpct:margin!=null&&buy?margin/buy*100:null,v24,vmin24,v1,dev,
     hv:d.highPriceVolume||0,lv:d.lowPriceVolume||0,aH:d.avgHighPrice||null,aL:d.avgLowPrice||null,tH:l.highTime||0,tL:l.lowTime||0,
     oldest:Math.min(l.highTime||0,l.lowTime||0),
