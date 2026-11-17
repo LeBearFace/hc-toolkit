@@ -351,12 +351,19 @@ body.compact .it{min-width:150px}
 body.compact .tiles{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
 body.compact #compactBtn{background:linear-gradient(#94351f,var(--sel));color:var(--yel)}
 @media (max-width:640px){.hide-c,.logo-s,.status{display:none}.bar{flex-wrap:wrap}}
+.atl-mods{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
+.atl-g{display:flex;flex-direction:column;gap:3px}.atl-g b{margin-bottom:2px}.atl-g label{font-size:13px;cursor:pointer}
+tr.atl-ch td{background:color-mix(in srgb,var(--yel,#d4a017) 14%,transparent)}
+.atl-ideas li.atl-done span{opacity:.55;text-decoration:line-through}
+body.compact .atl-mods{grid-template-columns:1fr}
+/* 1.1 : sous ~1200 px la barre du haut passe sur 2 lignes (avant : ⚙ et ⇔ sortaient de l'écran) */
+@media (max-width:1200px){.bar{flex-wrap:wrap}.search{min-width:200px}}
 </style>
 </head>
 <body>
 <header id="hd">
   <div class="bar">
-    <div class="logo"><button class="logo-b" data-tab="home" title="Accueil"><span class="logo-mark" aria-hidden="true">HC</span><span class="logo-t">HC Toolkit</span></button><small class="logo-s">Hardcore Worlds · <button class="linkish" id="changelog" title="Nouveautés">v1.0.1</button></small></div>
+    <div class="logo"><button class="logo-b" data-tab="home" title="Accueil"><span class="logo-mark" aria-hidden="true">HC</span><span class="logo-t">HC Toolkit</span></button><small class="logo-s">Hardcore Worlds · <button class="linkish" id="changelog" title="Nouveautés">v1.1</button></small></div>
     <div class="search"><input id="q" type="search" placeholder="Rechercher un objet…   ( / )" autocomplete="off"><button class="btn kbtn" id="palBtn" title="Aller n'importe où (Ctrl+K)">⌘K</button></div>
     <div class="ctrl">
       <span class="status" id="status">Chargement…</span>
@@ -369,6 +376,7 @@ body.compact #compactBtn{background:linear-gradient(#94351f,var(--sel));color:va
       <details class="menu" id="menu"><summary class="btn" title="Réglages">⚙</summary><div class="menu-p">
         <b class="menu-t">Réglages</b>
         <button class="btn" id="backup" title="Sauvegarder ou restaurer favoris, alertes, réglages et personnage">💾 Mes données</button>
+        <button class="btn" data-tab="atelier" title="Modules, tous les réglages, caches, carnet d'idées">🛠️ Atelier</button>
         <label class="menu-l">Son des alertes <select id="sound" title="Son des alertes"><option value="happy">🎉 Hybride joyeux</option><option value="voice">🗣️ Voix douce « ding »</option><option value="chime">🔔 Carillon doux</option><option value="beep">📟 Bip</option><option value="off">🔇 Muet</option></select></label>
         <label class="menu-l"><select id="voice" title="Voix (✨ = voix naturelle, la plus humaine)" hidden></select></label>
         <button class="btn" id="soundTest" title="Écouter le son choisi">▶ Tester le son</button>
@@ -411,8 +419,9 @@ let favs=new Set(store.get('favs',[]));
 let rules=store.get('rules',[]);           // {id, dir:'above'|'below', price}
 let alertLog=store.get('alertlog',[]);     // {t, msg}
 let fired=store.get('fired',{});           // key -> timestamp
-let settings=Object.assign({minVol:100,minPct:1,hitPct:10,hitVol:200,hitScope:'all',hitOn:true,
-  noise:true,nzVol:50,nzAge:6,nzPct:200,nzDev:50,xMode:'cheap',shopDir:'buy',bigTrades:10,bigPct:5,bigGp:20000,bigAge:12,tfTarget:1,tfDays:7,tfShare:25,tfNoBond:false,tfMinVol:20,advCap:1000000,advRisk:1,advMinRoi:1,advMinProfit:2000,instMin:2000,chSafe:false,dirMode:'item',wardAll:false,rsN:10,rsGen:false,epK:50,epGen:true,ntH:8,ntCap:50,ntW:40,ntSlots:8,ntGloves:true,ntMin:5000,ntBudget:0,shipBoat:'Skiff',shipBuy:true,shipSail:61,shipCon:50,shipCore:{},shipFac:{},shipSplit:'auto',kGloves:false,stkN:35},store.get('settings',{}));
+const DEFAULTS={minVol:100,minPct:1,hitPct:10,hitVol:200,hitScope:'all',hitOn:true,
+  noise:true,nzVol:50,nzAge:6,nzPct:200,nzDev:50,xMode:'cheap',shopDir:'buy',bigTrades:10,bigPct:5,bigGp:20000,bigAge:12,tfTarget:1,tfDays:7,tfShare:25,tfNoBond:false,tfMinVol:20,advCap:1000000,advRisk:1,advMinRoi:1,advMinProfit:2000,instMin:2000,chSafe:false,dirMode:'item',wardAll:false,rsN:10,rsGen:false,epK:50,epGen:true,ntH:8,ntCap:50,ntW:40,ntSlots:8,ntGloves:true,ntMin:5000,ntBudget:0,shipBoat:'Skiff',shipBuy:true,shipSail:61,shipCon:50,shipCore:{},shipFac:{},shipSplit:'auto',kGloves:false,stkN:35};
+let settings=Object.assign(JSON.parse(JSON.stringify(DEFAULTS)),store.get('settings',{})); // 1.1 : valeurs d'origine dans DEFAULTS (Atelier)
 let OS_LAT={},OS_D24={},QXP=[],PACKS_DATA=[],SETS_DATA=[],SHOPINFO={},MAPVER={0:'2019-10-31_1'};
 /* contenu de tous les packs du jeu (catégorie wiki « Item packs ») */
 function markDanger(){SHOPS.forEach(x=>{const i=SHOPINFO[x.shop]||{};x.danger=/wilderness|mage arena/i.test(i.loc||'')||/lundail|bandit duty free|mage arena/i.test(x.shop)})}
@@ -1051,7 +1060,7 @@ VIEWS.prog={label:'Progression & XP',custom:true,render:()=>renderProg()};
 VIEWS.advice={label:'Conseils 💰',custom:true,render:()=>renderAdvice()};
 VIEWS.night={label:'Ordres de nuit 🌙',custom:true,render:()=>renderNight()};
 VIEWS.ship={label:'Chantier naval ⛵',custom:true,render:()=>renderShip()};
-VIEWS.sticks={label:'Trading sticks 🪵',custom:true,render:()=>renderSticks()};
+VIEWS.sticks={label:'Trading sticks 🌴',custom:true,render:()=>renderSticks()};
 VIEWS.home={label:'Accueil',custom:true,render:()=>renderHome()};
 VIEWS.tour={label:'Tournée PNJ 🔁',custom:true,render:()=>renderTour()};
 VIEWS.runes={label:'Runes en magasin 🔮',custom:true,render:()=>renderRunes()};
@@ -1070,8 +1079,8 @@ function itemCell(r){
 
 /* ---------- navigation par thèmes : chaque onglet dit quel mouvement il propose ---------- */
 const GROUPS=[['home','🏠 Accueil',['home']],['plan','🧭 Mon plan',['advice','night','instant','prog']],['ge','📈 Bourse (GE)',['flips','big','hits','favs','all']],
-  ['npc','🏪 PNJ & magasins',['tour','dir','resell','ward','sticks','runes','epic','shops','packs','sets']],['make','⚗️ Transformer',['alch','craft','offcuts','ship']],...(WORLD==='osrs'?[]:[['hc','🌍 HC → OSRS',['cross','transfer']]]),['alerts','🔔 Alertes',['alerts']]];
-const MOVES={tour:['📈 Offres basses au GE','🏪 Vends 1 de chaque au PNJ','🔁 Change de monde'],runes:['🏪 Achète au PNJ','💰 Économise sur le GE'],offcuts:['🏪 Poissons chez Frankie','🔪 Coupe sur place','📈 Revends les offcuts'],sticks:['📈 Achète des opales au GE','💎 Vends-les à Gabooty (Tai Bwo Wannai) contre des sticks','🪵 Machette, gout tuber ou sticks à revendre'],ship:['⛵ Choisis tes pièces','🛒 Offres basses au GE (ou PNJ moins cher)','🔨 Construis au chantier'],night:['🌙 Offres d\'achat basses au GE avant de dormir','☀️ Le matin, récupère','🏪 Revends au PNJ (change de monde)'],advice:['💰 Ton capital','🛒 Liste de courses, du plus sûr au plus risqué'],instant:['⚡ Achète tout de suite au GE','🛠️ PNJ, alch, craft, pack ou ensemble','💰 Profit immédiat'],
+  ['npc','🏪 PNJ & magasins',['tour','dir','resell','ward','sticks','runes','epic','shops','packs','sets']],['make','⚗️ Transformer',['alch','craft','offcuts','ship']],...(WORLD==='osrs'?[]:[['hc','🌍 HC → OSRS',['cross','transfer']]]),['alerts','🔔 Alertes',['alerts']],['admin','🛠️ Atelier',['atelier']]];
+const MOVES={tour:['📈 Offres basses au GE','🏪 Vends 1 de chaque au PNJ','🔁 Change de monde'],runes:['🏪 Achète au PNJ','💰 Économise sur le GE'],offcuts:['🏪 Poissons chez Frankie','🔪 Coupe sur place','📈 Revends les offcuts'],sticks:['📈 Achète des opales au GE','💎 Vends-les à Gabooty (Tai Bwo Wannai) contre des sticks','🌴 Machette, gout tuber ou sticks à revendre'],ship:['⛵ Choisis tes pièces','🛒 Offres basses au GE (ou PNJ moins cher)','🔨 Construis au chantier'],night:['🌙 Offres d\'achat basses au GE avant de dormir','☀️ Le matin, récupère','🏪 Revends au PNJ (change de monde)'],advice:['💰 Ton capital','🛒 Liste de courses, du plus sûr au plus risqué'],instant:['⚡ Achète tout de suite au GE','🛠️ PNJ, alch, craft, pack ou ensemble','💰 Profit immédiat'],
   prog:['🎯 Ton niveau','📚 La méthode la moins chère','🗺️ Ton plan d\'XP'],
   flips:['📈 Offre d\'achat basse au GE','⏳ Attends qu\'elle se remplisse','📈 Revends plus haut au GE'],big:['📈 Offre d\'achat basse','⏳ Patience (peu d\'échanges)','📈 Revends avec un gros écart'],
   hits:['👀 Repère une forte hausse ou chute','📈 Achète ou vends au bon moment'],favs:['★ Tes objets suivis','⏱️ Prix en direct'],all:['🔎 Tous les objets du GE HC'],
@@ -1086,14 +1095,14 @@ const NEWTABS=new Set(['night','ship','sticks','offcuts','tour','runes']);
 function renderTabs(){
   const g=groupOf(tab);lastInGroup[g]=tab;
   const cnt=k=>k==='favs'?favs.size:k==='alerts'?rules.length:null;
-  $('#rail').innerHTML=GROUPS.map(([k,l,sub])=>`<div class="rg">${sub.length>1?`<button class="rgh" data-group="${k}">${l}</button>`:''}${sub.map(t=>{const v=VIEWS[t];if(!v)return'';const n=cnt(t);
-    return `<button class="ri${NEWTABS.has(t)&&n==null?' new':''}" role="tab" data-tab="${t}" aria-selected="${t===tab}">${sub.length>1?esc(v.label):l}${n!=null?`<span class="n">${n}</span>`:''}</button>`}).join('')}</div>`).join('')+
+  $('#rail').innerHTML=GROUPS.map(([k,l,sub0])=>{const sub=sub0.filter(t=>VIEWS[t]&&!modHidden(t));if(!sub.length)return '';return `<div class="rg">${sub.length>1?`<button class="rgh" data-group="${k}">${l}</button>`:''}${sub.map(t=>{const v=VIEWS[t];if(!v)return'';const n=cnt(t);
+    return `<button class="ri${NEWTABS.has(t)&&n==null?' new':''}" role="tab" data-tab="${t}" aria-selected="${t===tab}">${sub.length>1?esc(v.label):l}${n!=null?`<span class="n">${n}</span>`:''}</button>`}).join('')}</div>`}).join('')+
     `<div class="rail-foot">Ctrl+K : aller n'importe où<br>/ : chercher un objet</div>`;
   const cur=$('#rail [aria-selected=true]');if(cur&&cur.scrollIntoView&&document.body.classList.contains('compact'))cur.scrollIntoView({block:'nearest',inline:'nearest'});
   renderMove();
 }
 function render(){
-  if(!VIEWS[tab])tab='home';
+  if(!VIEWS[tab]||modHidden(tab))tab='home';
   renderTabs();
   const v=VIEWS[tab];$('#error').hidden=true;
   if(v.custom){(v.render||renderAlerts)();return}
@@ -1687,7 +1696,7 @@ function openPalette(){if(PAL){PAL.querySelector('input').focus();return}
   PAL=document.createElement('div');PAL.className='pal';PAL.innerHTML=`<div class="pal-b" role="dialog" aria-label="Aller à"><input placeholder="Module, objet ou magasin…" aria-label="Rechercher"><div class="pal-l"></div><div class="pal-k">↑ ↓ pour choisir · Entrée pour ouvrir · Échap pour fermer</div></div>`;
   document.body.appendChild(PAL);const inp=PAL.querySelector('input'),list=PAL.querySelector('.pal-l');let items=[],sel=0;
   const shopNames=[...new Set(SHOPS.map(x=>x.shop))];
-  const run=()=>{const q=norm(inp.value.trim());const views=Object.entries(VIEWS).filter(([k,v])=>!q||norm(v.label).includes(q)).map(([k,v])=>({k:'tab',v:k,t:v.label,s:'module'}));
+  const run=()=>{const q=norm(inp.value.trim());const views=Object.entries(VIEWS).filter(([k,v])=>!modHidden(k)&&(!q||norm(v.label).includes(q))).map(([k,v])=>({k:'tab',v:k,t:v.label,s:'module'}));
     let its=[];if(q.length>=2){its=Object.values(MAP).filter(m=>norm(m.name).includes(q)).map(m=>({m,v:(D24[m.id]||{}).highPriceVolume||0})).sort((a,b)=>b.v-a.v).slice(0,8).map(x=>({k:'item',v:x.m.id,t:x.m.name,s:'objet',img:icon(x.m)}))}
     const sh=q.length>=2?shopNames.filter(n=>norm(n).includes(q)).slice(0,5).map(n=>({k:'shop',v:n,t:n,s:'magasin'})):[];
     items=[...views.slice(0,q?8:30),...its,...sh];sel=Math.min(sel,Math.max(0,items.length-1));
@@ -1706,7 +1715,7 @@ function syncHeader(){const h=$('#hd');if(h)document.documentElement.style.setPr
 /* ---------- accueil ---------- */
 const HOME_TILES=[['advice','💰','Conseils','Ta liste de courses selon ton capital'],['night','🌙','Ordres de nuit','Offres à laisser tourner, capital par alt'],['tour','🔁','Tournée PNJ','1 objet par monde : ce qui rapporte, magasin par magasin'],
   ['instant','⚡','Achat immédiat','Ce qui rapporte tout de suite'],['favs','★','Favoris en direct','Prix toutes les 10 s, flèches'],['offcuts','🐟','Fish offcuts','Poissons de Frankie → offcuts'],
-  ['sticks','🪵','Trading sticks','Gemmes → sticks → machettes'],['ship','⛵','Chantier naval','Pièces de bateau, offres basses'],['dir','📍','Annuaire PNJ','Carte, stock, accès et prérequis'],
+  ['sticks','🌴','Trading sticks','Gemmes → sticks → machettes'],['ship','⛵','Chantier naval','Pièces de bateau, offres basses'],['dir','📍','Annuaire PNJ','Carte, stock, accès et prérequis'],
   ['craft','🔨','Fabrication','Toutes les recettes rentables'],['prog','🎯','Progression','Ton plan d\'XP le moins cher'],['flips','📈','Flips','Acheter bas, revendre haut']];
 function renderHome(){const host=hostBox();$('#intro').textContent='';
   let opps=[];try{opps=adviceList().list.slice(0,6)}catch(e){}
@@ -1720,7 +1729,7 @@ function renderHome(){const host=hostBox();$('#intro').textContent='';
      <div class="stat"><span>Personnage</span><b>${profile&&profile.name?esc(profile.name):'–'}</b></div></section>
     <section class="box"><div class="h2s"><h3>Meilleures occasions maintenant</h3><button class="linkish" data-tab="advice">tout voir →</button></div>
      ${opps.length?`<div class="opps">${opps.map(c=>`<div class="opp" data-id="${c.id}"><span>${itemCell(base(c.id))}</span><b class="up">+${gp(c.profit)}</b><span class="why">${nf.format(c.q)} × ${gp(c.price)} · ${esc(c.where||'')} — ${esc(c.why||'')}</span></div>`).join('')}</div>`:'<p class="mut small">Rien pour l\'instant avec ton capital (onglet Conseils pour régler).</p>'}</section>
-    <section><div class="tiles">${HOME_TILES.filter(t=>VIEWS[t[0]]).map(([k,i,t,d])=>`<button class="tile" data-tab="${k}"><span class="ti">${i}</span><b>${t}</b><span>${d}</span></button>`).join('')}</div></section>
+    <section><div class="tiles">${HOME_TILES.filter(t=>VIEWS[t[0]]&&!modHidden(t[0])).map(([k,i,t,d])=>`<button class="tile" data-tab="${k}"><span class="ti">${i}</span><b>${t}</b><span>${d}</span></button>`).join('')}</div></section>
     ${favL.length?`<section class="box"><div class="h2s"><h3>Tes favoris</h3><button class="linkish" data-tab="favs">en direct →</button></div><div class="tablewrap"><table><thead><tr><th class="l">Objet</th><th>Achat</th><th>Vente</th><th>Marge</th><th>Vol. 24 h</th></tr></thead><tbody>${favL.map(id=>{const b=base(id);return `<tr data-id="${id}"><td class="l">${itemCell(b)}</td><td class="num">${gpc(b.buy)}</td><td class="num">${gpc(b.sell)}</td><td class="num"><span class="${cls(b.margin)}">${gp(b.margin)}</span></td><td class="num">${gp(b.v24)}</td></tr>`}).join('')}</tbody></table></div></section>`:''}
     <section class="box"><h3>Raccourcis</h3><ul class="list"><li><span><b>Ctrl+K</b> : aller à n'importe quel module, objet ou magasin</span></li><li><span><b>/</b> : chercher un objet dans la liste</span></li><li><span><b>⇔ Panneau</b> : interface étroite à coller à côté du jeu (le lanceur « à côté du jeu » l'active)</span></li></ul></section></div>`;
   host.innerHTML=h}
@@ -1912,7 +1921,11 @@ function setLive(sec){liveSec=+sec;store.set('liveSec',liveSec);clearInterval(li
 function favRows(){const ids=[...favs].filter(id=>MAP[id]);hcwWant(ids);wantSpark(ids);return ids.map(id=>base(id))}
 
 const CHANGELOG=`<div class="dh"><h2>Nouveautés</h2><button class="btn" id="close">Fermer</button></div>
- <div class="box"><h3>v1.0.1 · 17 novembre 2026</h3><ul class="list">
+ <div class="box"><h3>v1.1 « Atelier » · 17 novembre 2026</h3><ul class="list">
+  <li><span><b>🛠️ Atelier</b> (barre latérale, menu ⚙ ou Ctrl+K) : affiche ou masque les modules, règle tout l'outil au même endroit avec ↺ pour revenir à l'origine, recharge les magasins ou les accès PNJ, et note tes idées pour les prochaines versions (bouton « Copier tout » pour Claude).</span></li>
+  <li><span>Modules masqués et idées sont inclus dans 💾 Mes données.</span></li>
+</ul></div>
+<div class="box"><h3>v1.0.1 · 17 novembre 2026</h3><ul class="list">
   <li><span><b>Stocks illimités</b> : au 2ᵉ lancement de la journée, les 758 lignes de magasins à stock ∞ (plumes, runes de base…) passaient à 0 et disparaissaient des calculs. Corrigé.</span></li>
   <li><span><b>Alertes « chute / hausse »</b> : la variation 1 h compare maintenant le même côté du marché. Fini les fausses chutes quand seuls les vendeurs ont échangé dans l'heure (ex. Red feather −37 %).</span></li>
   <li><span><b>« Prix suspect »</b> : un objet qui a vraiment bougé n'est plus marqué suspect ; seul un trade isolé, loin de la moyenne 24 h <i>et</i> de la dernière heure, l'est.</span></li>
@@ -1928,7 +1941,7 @@ const CHANGELOG=`<div class="dh"><h2>Nouveautés</h2><button class="btn" id="clo
   <li><span><b>Runes en magasin 🔮</b> et <b>Fish offcuts 🐟</b> (Frankie, couteau ou chum station, historique 7 jours).</span></li>
   <li><span>Réglages (son, voix, notifications, sauvegarde, Karamja gloves) regroupés dans le menu ⚙.</span></li></ul></div>
  <div class="box"><h3>v2.1 · 17 novembre 2026</h3><ul class="list">
-  <li><span><b>Trading sticks 🪵</b> (PNJ & magasins) : quelle gemme vendre à Gabooty, prix de revient d'un stick, et ce que rapportent machettes, gout tuber ou sticks revendus au GE.</span></li>
+  <li><span><b>Trading sticks 🌴</b> (PNJ & magasins) : quelle gemme vendre à Gabooty, prix de revient d'un stick, et ce que rapportent machettes, gout tuber ou sticks revendus au GE.</span></li>
   <li><span><b>Karamja gloves</b> : case à cocher dans « Revente aux PNJ », « Trading sticks » et « Ordres de nuit ». Obli (Shilo) rachète alors tout objet à 60 %, Davon à 100 %, Fernahei à 80 %.</span></li>
   <li><span><b>Chantier naval ⛵</b> (Transformer) : choisis bateau, pièces principales et installations ; l'outil additionne les matériaux, propose une offre basse pour chacun (prix bas habituel sur 7 jours), signale les PNJ moins chers (clous du Sawmill…) et les objets peu échangés. Préréglages Jubbly Jive et Pirate shipwreck.</span></li>
   <li><span><b>Ordres de nuit 🌙</b> (Mon plan) : offres GE basses à laisser tourner la nuit et revente garantie à un PNJ le lendemain. Quantités calculées selon la nuit, les vendeurs captés et les mondes à visiter ; capital à donner à chaque alt par paquet d'emplacements GE ; capital disponible optionnel.</span></li></ul></div>
@@ -2195,9 +2208,10 @@ function setAuto(sec){clearInterval(autoTimer);if(+sec)autoTimer=setInterval(ref
 /* ---------- events ---------- */
 document.addEventListener('click',e=>{
   if(onV1Click(e))return;
+  if(tab==='atelier'&&onAtelierClick(e))return;
   const st=e.target.closest('[data-star]');if(st){e.stopPropagation();const id=+st.dataset.star;favs.has(id)?favs.delete(id):favs.add(id);store.set('favs',[...favs]);
     document.querySelectorAll(`[data-star="${id}"]`).forEach(b=>b.classList.toggle('on',favs.has(id)));renderTabs();if(tab==='favs')render();return}
-  const gb=e.target.closest('[data-group]');if(gb){const G=GROUPS.find(x=>x[0]===gb.dataset.group);tab=lastInGroup[G[0]]&&G[2].includes(lastInGroup[G[0]])?lastInGroup[G[0]]:G[2][0];store.set('lastInGroup',lastInGroup);store.set('tab',tab);shown=200;const ah=$('#alertsHost');if(ah)ah.hidden=true;render();return}
+  const gb=e.target.closest('[data-group]');if(gb){const G=GROUPS.find(x=>x[0]===gb.dataset.group);const vis=G[2].filter(t=>!modHidden(t));tab=lastInGroup[G[0]]&&vis.includes(lastInGroup[G[0]])?lastInGroup[G[0]]:(vis[0]||'home');store.set('lastInGroup',lastInGroup);store.set('tab',tab);shown=200;const ah=$('#alertsHost');if(ah)ah.hidden=true;render();return}
   const tb=e.target.closest('[data-tab]');if(tb){tab=tb.dataset.tab;store.set('tab',tab);shown=200;const ah=$('#alertsHost');if(ah)ah.hidden=true;render();return}
   const iw=e.target.closest('[data-iw]');if(iw&&!e.target.closest('[data-star]')){e.preventDefault();itemWin(iw.dataset.iw);return}
   const sw=e.target.closest('[data-sw]');if(sw){e.preventDefault();shopWin(sw.dataset.sw);return}
@@ -2225,6 +2239,7 @@ document.addEventListener('click',e=>{
 });
 document.addEventListener('change',e=>{
   if(onV1Change(e))return;
+  if(tab==='atelier'&&onAtelierChange(e))return;
   if(tab==='ship'&&onShipChange(e))return;
   if(tab==='sticks'&&onSticksChange(e))return;
   if(tab==='prog'&&onProgChange(e))return;
@@ -2257,6 +2272,105 @@ document.addEventListener('input',e=>{
 let qT;$('#q').addEventListener('input',()=>{clearTimeout(qT);qT=setTimeout(()=>{shown=200;if(VIEWS[tab].custom){tab='all';const ah=$('#alertsHost');if(ah)ah.hidden=true}render()},150)});
 $('#more').onclick=()=>{shown+=300;render()};
 $('#refresh').onclick=refresh;
+/* ===== 1.1 : Atelier (admin) — modules, réglages, caches, carnet d'idées ===== */
+const ATL_KEEP=new Set(['home','atelier']);
+let hiddenMods=new Set(store.get('hidden',[]));
+function modHidden(t){return hiddenMods.has(t)&&!ATL_KEEP.has(t)}
+let ideas=store.get('ideas',[]);
+/* clé : [section, libellé, unité ou liste de choix] — les clés absentes vont dans « Autres » */
+const SET_INFO={
+  minVol:['Flips','Volume min 24 h (côté le plus faible)'],minPct:['Flips','Marge min','%'],
+  hitOn:['Gros mouvements & alertes','Me prévenir des gros mouvements'],hitScope:['Gros mouvements & alertes','Surveiller',{all:'tous les objets',favs:'mes favoris seulement'}],
+  hitPct:['Gros mouvements & alertes','Variation min (1 h / 24 h)','%'],hitVol:['Gros mouvements & alertes','Volume min sur 1 h'],
+  noise:['Anti-bruit','Masquer les objets peu fiables'],nzVol:['Anti-bruit','Volume min par côté (24 h)'],nzAge:['Anti-bruit','Prix plus récent que','h'],
+  nzPct:['Anti-bruit','Marge max (au-delà = aberrant)','%'],nzDev:['Anti-bruit','Écart max à la moyenne 24 h','%'],
+  bigTrades:['Gros objets','Échanges min / 24 h'],bigPct:['Gros objets','Écart min','%'],bigGp:['Gros objets','Écart min','gp'],bigAge:['Gros objets','Derniers trades de moins de','h'],
+  advCap:['Conseils','Mon capital','gp'],advRisk:['Conseils','Prudence',{1:'1 · sûr',2:'2 · équilibré',3:'3 · offensif'}],advMinRoi:['Conseils','Rendement min','%'],advMinProfit:['Conseils','Profit min par ligne','gp'],
+  instMin:['Achat immédiat','Profit min par lot','gp'],
+  ntH:['Ordres de nuit','Heures de nuit','h'],ntCap:['Ordres de nuit','Vendeurs captés','%'],ntW:['Ordres de nuit','Mondes max / objet'],ntSlots:['Ordres de nuit','Emplacements GE / alt'],
+  ntMin:['Ordres de nuit','Profit min / ligne','gp'],ntBudget:['Ordres de nuit','Capital dispo (0 = illimité)','gp'],ntGloves:['Ordres de nuit','Compter les Karamja gloves'],
+  kGloves:['Personnage','Je porte les Karamja gloves'],shipSail:['Personnage','Mon Sailing'],shipCon:['Personnage','Ma Construction'],
+  shipBoat:['Chantier naval','Bateau',{Skiff:'Skiff',Sloop:'Sloop'}],shipBuy:['Chantier naval','Acheter le bateau au shipwright'],shipSplit:['Chantier naval','Pièces de coque',{auto:'le moins cher',buy:'acheter toutes faites',make:'fabriquer'}],
+  tourMin:['Tournée PNJ','Profit min par objet','gp'],stkN:['Trading sticks','Gemmes vendues par monde'],
+  offSale:['Fish offcuts','Prix de vente d\'un offcut (0 = prix actuel)','gp'],offInv:['Fish offcuts','Temps achat / inventaire','s'],offHop:['Fish offcuts','Temps de changement de monde','s'],
+  rsN:['Revente PNJ','Classer pour (quantité)'],rsGen:['Revente PNJ','Inclure les magasins généraux'],epK:['Revente PNJ','Rentable même avec (en trop)'],epGen:['Revente PNJ','Inclure les magasins généraux (sans limite)'],
+  wardAll:['Revente PNJ','Chadwell : afficher aussi le non rentable'],chSafe:['Fabrication','Seulement les sorties garanties'],
+  tfTarget:['HC → OSRS','Objectif','bond(s)'],tfDays:['HC → OSRS','Achats étalés sur','jours'],tfShare:['HC → OSRS','Part max du marché','%'],tfNoBond:['HC → OSRS','Sans acheter de bond'],tfMinVol:['HC → OSRS','Volume min'],
+  xMode:['HC → OSRS','Afficher',{cheap:'objets à rapporter (HC moins cher)',dear:'objets plus chers sur HC'}],
+  shopDir:['Magasins','Sens',{buy:'magasin → GE',sell:'GE → magasin'}],dirMode:['Magasins','Annuaire : chercher par',{item:'objet',shop:'magasin'}]};
+const SET_SKIP=new Set(['shipCore','shipFac','offSel','tourShop','offMeth','ntGloves']); // choix faits dans les modules (listes, sélection) : on ne les montre pas ici
+const SET_ORDER=['Personnage','Conseils','Ordres de nuit','Gros mouvements & alertes','Anti-bruit','Flips','Gros objets','Achat immédiat','Tournée PNJ','Revente PNJ','Magasins','Trading sticks','Fish offcuts','Chantier naval','Fabrication','HC → OSRS','Autres'];
+const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+function setVal(k){return settings[k]}
+function lsSize(k){try{const v=localStorage.getItem(k);return v?k.length+v.length:0}catch(e){return 0}} // en caractères : c'est ce que les navigateurs limitent
+function kb(n){return n>=1e6?(n/1e6).toFixed(1).replace('.',',')+' M car.':Math.max(1,Math.round(n/1000))+' k car.'}
+function renderAtelier(){const host=hostBox();
+  $('#intro').textContent='Ton atelier : choisis les modules affichés, règle tout l\'outil au même endroit, vide les caches et note tes idées pour les prochaines versions.';
+  // modules
+  const mods=GROUPS.filter(g=>g[2].some(t=>VIEWS[t]&&!ATL_KEEP.has(t))).map(([k,l,sub])=>`<div class="atl-g"><b>${l}</b>${sub.filter(t=>VIEWS[t]&&!ATL_KEEP.has(t)).map(t=>`<label><input type="checkbox" data-mod="${t}" ${modHidden(t)?'':'checked'}> ${esc(VIEWS[t].label)}</label>`).join('')}</div>`).join('');
+  // réglages
+  const keys=[...new Set([...Object.keys(DEFAULTS),...Object.keys(settings)])].filter(k=>!SET_SKIP.has(k)&&typeof (settings[k]??DEFAULTS[k])!=='object');
+  const bySec={};keys.forEach(k=>{const sec=(SET_INFO[k]||['Autres'])[0];(bySec[sec]=bySec[sec]||[]).push(k)});
+  const field=k=>{const info=SET_INFO[k]||['Autres',k];const v=setVal(k),d=DEFAULTS[k];const changed=k in DEFAULTS?!same(v,d):v!=null;
+    let inp;const opt=info[2]&&typeof info[2]==='object'?info[2]:null;
+    if(typeof (v??d)==='boolean')inp=`<input type="checkbox" data-set="${k}" ${v?'checked':''}>`;
+    else if(opt)inp=`<select data-set="${k}">${Object.entries(opt).map(([ov,ol])=>`<option value="${esc(ov)}" ${String(v)===ov?'selected':''}>${esc(ol)}</option>`).join('')}</select>`;
+    else if(typeof (v??d)==='number'||v==null)inp=`<input type="number" data-set="${k}" value="${v??''}" style="width:110px">${info[2]?' <span class="mut">'+esc(info[2])+'</span>':''}`;
+    else inp=`<input type="text" data-set="${k}" value="${esc(v)}" style="width:140px">`;
+    const dv=k in DEFAULTS?(typeof d==='boolean'?(d?'oui':'non'):opt?(opt[d]||d):gp(d)):'réglage du module';
+    return `<tr class="${changed?'atl-ch':''}"><td class="l">${esc(info[1])}</td><td class="l">${inp}</td><td class="mut small">${esc(String(dv))}</td><td>${changed?`<button class="btn" data-reset="${k}" title="Revenir à la valeur d'origine">↺</button>`:''}</td></tr>`};
+  const nCh=keys.filter(k=>k in DEFAULTS?!same(settings[k],DEFAULTS[k]):settings[k]!=null).length;
+  const sets=SET_ORDER.filter(s=>bySec[s]).map(s=>`<details class="accd"${s==='Personnage'||s==='Conseils'?' open':''}><summary>${esc(s)} <span class="mut">(${bySec[s].length})</span></summary><div class="tablewrap"><table><thead><tr><th class="l">Réglage</th><th class="l">Valeur</th><th>D'origine</th><th></th></tr></thead><tbody>${bySec[s].map(field).join('')}</tbody></table></div></details>`).join('');
+  // stockage
+  let tot=0;const rows=[];try{for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(!k.startsWith('hcx_'))continue;const n=lsSize(k);tot+=n;rows.push([k.slice(4),n])}}catch(e){}
+  rows.sort((a,b)=>b[1]-a[1]);
+  const st=store.get('static8',null);const stAge=st&&st.t?ago2(st.t):'–';
+  // idées
+  const idl=ideas.length?`<ul class="list atl-ideas">${ideas.map((x,i)=>`<li class="${x.done?'atl-done':''}"><span><input type="checkbox" data-idone="${i}" ${x.done?'checked':''}> ${esc(x.t)} <span class="mut small">· ${esc(x.d)}</span></span><button class="btn" data-idel="${i}" title="Supprimer">✕</button></li>`).join('')}</ul>`:'<p class="mut">Aucune idée pour l\'instant.</p>';
+  host.innerHTML=`<div class="atl">
+   <div class="box"><h3>🧩 Modules affichés</h3><p class="mut small">Décoche ce que tu n'utilises pas : il disparaît de la barre latérale, de l'accueil et de Ctrl+K. Rien n'est effacé, tu peux le remettre quand tu veux.</p>
+    <div class="atl-mods">${mods}</div><div class="row" style="margin-top:8px"><button class="btn" id="atlShowAll">Tout afficher</button></div></div>
+   <div class="box"><h3>⚙️ Tous les réglages <span class="mut small">(${nCh} modifié${nCh>1?'s':''})</span></h3><p class="mut small">Les mêmes réglages que dans chaque module, rassemblés ici. Une ligne surlignée a été changée ; ↺ la remet à sa valeur d'origine.</p>
+    ${sets}<div class="row" style="margin-top:8px"><button class="btn" id="atlResetAll">↺ Tout remettre d'origine</button><span class="small" id="atlMsg"></span></div></div>
+   <div class="box"><h3>🗄️ Caches et stockage</h3><p class="mut small">Les magasins, recettes et packs du wiki sont gardés 24 h pour démarrer vite (dernier chargement : ${stAge}). Vide-les si le wiki a changé ou si quelque chose semble faux. Tes favoris, alertes et réglages ne sont jamais touchés ici.</p>
+    <div class="kv"><div><span>Espace utilisé</span><b class="${tot>4e6?'down':''}">${kb(tot)}</b></div><div><span>Limite (Edge / Chrome)</span><b>≈ 5 M car.</b></div><div><span>Version</span><b>${esc($('#changelog').textContent)}</b></div></div>
+    <div class="row" style="margin-top:8px;flex-wrap:wrap"><button class="btn" id="atlClrStatic">🔄 Recharger magasins et recettes</button><button class="btn" id="atlClrAccess">🔄 Revérifier les accès PNJ</button><button class="btn" id="atlClrLog">🧹 Vider le journal d'alertes</button></div>
+    <details class="accd"><summary>Détail du stockage</summary><ul class="list">${rows.map(([k,n])=>`<li><span>${esc(k)}</span><b>${kb(n)}</b></li>`).join('')}</ul></details></div>
+   <div class="box"><h3>💡 Mes idées</h3><p class="mut small">Note ici ce que tu voudrais dans les prochaines versions. « Copier tout » te donne un texte à coller à Claude.</p>
+    <div class="row"><input type="text" id="ideaIn" placeholder="Ex. : alerte quand l'Uncut jade repasse sous 40 gp" style="flex:1;min-width:200px"><button class="btn primary" id="ideaAdd">Ajouter</button></div>
+    ${idl}${ideas.length?`<div class="row" style="margin-top:8px"><button class="btn" id="ideaCopy">📋 Copier tout</button><span class="small" id="ideaMsg"></span></div>`:''}</div>
+   <div class="box"><h3>🔗 Liens</h3><ul class="list"><li><span>Version en ligne</span><a href="https://lebearface.github.io/hc-toolkit/" target="_blank" rel="noopener">lebearface.github.io/hc-toolkit</a></li>
+    <li><span>Version de test (prochaine version)</span><a href="https://lebearface.github.io/hc-toolkit/test/" target="_blank" rel="noopener">…/hc-toolkit/test/</a></li>
+    <li><span>Code et historique</span><a href="https://github.com/LeBearFace/hc-toolkit" target="_blank" rel="noopener">github.com/LeBearFace/hc-toolkit</a></li></ul></div></div>`}
+function saveSettings(){store.set('settings',settings)}
+// redessin différé : un « change » peut arriver pendant qu'un clic retire le champ (blur)
+let atlT=null;function atlLater(){clearTimeout(atlT);atlT=setTimeout(()=>{if(tab==='atelier')renderAtelier()},0)}
+function onAtelierChange(e){const t=e.target;
+  if(t.dataset.mod){t.checked?hiddenMods.delete(t.dataset.mod):hiddenMods.add(t.dataset.mod);store.set('hidden',[...hiddenMods]);renderTabs();return true}
+  if(t.dataset.set){const k=t.dataset.set;const d=k in DEFAULTS?DEFAULTS[k]:settings[k];
+    if(t.type==='checkbox')settings[k]=t.checked;
+    else if(t.tagName==='SELECT')settings[k]=typeof d==='number'?+t.value:t.value;
+    else if(t.type==='number'){if(t.value==='')delete settings[k];else settings[k]=parseFloat(t.value)||0}
+    else settings[k]=t.value;
+    saveSettings();atlLater();return true}
+  if(t.dataset.idone!=null){const x=ideas[+t.dataset.idone];if(x){x.done=t.checked;store.set('ideas',ideas);atlLater()}return true}
+  return false}
+function onAtelierClick(e){const t=e.target;
+  const r=t.closest('[data-reset]');if(r){const k=r.dataset.reset;if(k in DEFAULTS)settings[k]=JSON.parse(JSON.stringify(DEFAULTS[k]));else delete settings[k];saveSettings();renderAtelier();return true}
+  if(t.id==='atlResetAll'){if(t.dataset.sure!=='1'){t.dataset.sure='1';t.textContent='Sûr ? Clique encore pour confirmer';setTimeout(()=>{if(t.isConnected){t.dataset.sure='';t.textContent='↺ Tout remettre d\'origine'}},4000);return true}
+    const keepObj={shipCore:settings.shipCore,shipFac:settings.shipFac,offSel:settings.offSel,tourShop:settings.tourShop};
+    settings=Object.assign(JSON.parse(JSON.stringify(DEFAULTS)),Object.fromEntries(Object.entries(keepObj).filter(([k,v])=>v!=null)));saveSettings();renderAtelier();$('#atlMsg').textContent='Réglages remis d\'origine (tes choix de pièces de bateau et de poissons sont gardés).';return true}
+  if(t.id==='atlShowAll'){hiddenMods.clear();store.set('hidden',[]);renderTabs();renderAtelier();return true}
+  if(t.id==='atlClrStatic'){try{localStorage.removeItem('hcx_static8')}catch(err){}t.textContent='Rechargement…';setTimeout(()=>location.reload(),300);return true}
+  if(t.id==='atlClrAccess'){try{localStorage.removeItem('hcx_access3')}catch(err){}t.textContent='Accès effacés ✓ (revérifiés à la prochaine ouverture d\'un magasin)';return true}
+  if(t.id==='atlClrLog'){alertLog=[];store.set('alertlog',alertLog);t.textContent='Journal vidé ✓';return true}
+  if(t.id==='ideaAdd'){const i=$('#ideaIn');const v=(i.value||'').trim();if(!v)return true;ideas.unshift({t:v.slice(0,300),d:new Date().toLocaleDateString('fr-BE'),done:false});store.set('ideas',ideas);renderAtelier();const n=$('#ideaIn');if(n)n.focus();return true}
+  const dl=t.closest('[data-idel]');if(dl){ideas.splice(+dl.dataset.idel,1);store.set('ideas',ideas);renderAtelier();return true}
+  if(t.id==='ideaCopy'){const txt='Mes idées pour HC Toolkit :\n'+ideas.map(x=>(x.done?'[fait] ':'- ')+x.t+' ('+x.d+')').join('\n');
+    const m=$('#ideaMsg');try{navigator.clipboard.writeText(txt).then(()=>{m.textContent='Copié ✓'},()=>{m.textContent='Copie bloquée par le navigateur.'})}catch(err){m.textContent='Copie bloquée par le navigateur.'}return true}
+  return false}
+VIEWS.atelier={label:'Atelier 🛠️',custom:true,render:()=>renderAtelier()};
+document.addEventListener('keydown',e=>{if(e.target&&e.target.id==='ideaIn'&&e.key==='Enter'){e.preventDefault();const b=$('#ideaAdd');if(b)b.click()}});
 /* v1.0 : démarrage du portail */
 try{const qp=new URLSearchParams(location.search);if(qp.get('panel')==='1')store.set('compact',true);if(qp.get('panel')==='0')store.set('compact',false);if(qp.get('world')&&qp.get('world')!==WORLD&&/^(hc|osrs)$/.test(qp.get('world'))){localStorage.setItem('hcx_world',JSON.stringify(qp.get('world')));location.replace(location.pathname+(qp.get('panel')?'?panel='+qp.get('panel'):''))}}catch(e){}
 applyCompact();if(WORLD==='osrs')document.body.classList.add('osrs');
