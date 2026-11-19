@@ -363,7 +363,7 @@ body.compact .atl-mods{grid-template-columns:1fr}
 <body>
 <header id="hd">
   <div class="bar">
-    <div class="logo"><button class="logo-b" data-tab="home" title="Accueil"><span class="logo-mark" aria-hidden="true">HC</span><span class="logo-t">HC Toolkit</span></button><small class="logo-s">Hardcore Worlds · <button class="linkish" id="changelog" title="Nouveautés">v1.3</button></small></div>
+    <div class="logo"><button class="logo-b" data-tab="home" title="Accueil"><span class="logo-mark" aria-hidden="true">HC</span><span class="logo-t">HC Toolkit</span></button><small class="logo-s">Hardcore Worlds · <button class="linkish" id="changelog" title="Nouveautés">v1.5</button></small></div>
     <div class="search"><input id="q" type="search" placeholder="Rechercher un objet…   ( / )" autocomplete="off"><button class="btn kbtn" id="palBtn" title="Aller n'importe où (Ctrl+K)">⌘K</button></div>
     <div class="ctrl">
       <span class="status" id="status">Chargement…</span>
@@ -2065,6 +2065,11 @@ function setLive(sec){liveSec=+sec;store.set('liveSec',liveSec);clearInterval(li
 function favRows(){const ids=[...favs].filter(id=>MAP[id]);hcwWant(ids);wantSpark(ids);return ids.map(id=>base(id))}
 
 const CHANGELOG=`<div class="dh"><h2>Nouveautés</h2><button class="btn" id="close">Fermer</button></div>
+ <div class="box"><h3>v1.5 « Guides » · 19 novembre 2026</h3><ul class="list">
+  <li><span><b>📚 Guides</b> (nouveau groupe, juste sous 🧭 Mon plan) : tous tes guides au même endroit, classés par catégorie et par perso, avec une barre de progression. Coche les étapes au fur et à mesure ; si le perso est chargé dans Progression (WikiSync), quêtes et niveaux se cochent tout seuls.</span></li>
+  <li><span>Premier guide : <b>Bearinda : bilan des quêtes et route Perilous Moons</b>. Guides « à venir » prêts à demander : Prière 43, Prière 70, Agilité 99, Sailing 200 M, Construction 200 M, 10 milliards en un mois.</span></li>
+  <li><span><b>🧭 À faire maintenant</b> : les étapes libres de tes guides épinglés. Chaque étape est un nœud (besoins, danger HC) : la base du futur optimiseur de routes. ＋ Créer un guide : le tien, une étape par ligne.</span></li>
+</ul></div>
  <div class="box"><h3>v1.3 « Équipement & Clue scrolls » · 17 novembre 2026</h3><ul class="list">
   <li><span><b>⚔️ Équipement</b> (mêlée et distance) : essaie chaque pièce sur ton perso contre une vraie cible (coup max, précision, DPS, dégâts reçus, PV perdus par kill), avec prérequis vérifiés. Plan d'achat pour ton budget (plus rentable ou plus puissant), objectif puissance / équilibré / plus sûr pour le Hardcore, pièces gratuites à obtenir, prochains paliers de niveau, setups calculés, classiques et les tiens, comparaison A / B, import de banque (Data Export ou Bank Memory).</span></li>
   <li><span><b>🗺️ Clue scrolls</b> : contenu de tous les caskets, du débutant au maître, prix HC et OSRS côte à côte, valeur moyenne d'un casket et chance d'unique. Objets sans prix HC affichés en gris avec « N/A ».</span></li>
@@ -3018,6 +3023,124 @@ VIEWS.clues={label:'Clue scrolls 🗺️',custom:true,render:()=>renderClues()};
 .eqt{width:100%;border-collapse:collapse;font-size:12.5px}.eqt td.small{white-space:nowrap}.eqt th,.eqt td{padding:4px 6px;border-bottom:1px solid var(--line);text-align:right}.eqt th.l,.eqt td.l{text-align:left}.eqt tr.sel{outline:1px solid var(--gold)}.eqt td img{height:22px;vertical-align:middle;margin-right:4px}
 .eqb{font-size:12px;border-collapse:collapse;margin:6px 0}.eqb td,.eqb th{padding:2px 6px;text-align:right}.eqplan{margin:6px 0 10px;padding-left:22px;line-height:1.9}.eqplan img{height:20px;vertical-align:middle}`;document.head.appendChild(st)}
 document.addEventListener('keydown',e=>{if(e.target&&e.target.id==='ideaIn'&&e.key==='Enter'){e.preventDefault();const b=$('#ideaAdd');if(b)b.click()}});
+/* ================= v1.5 GUIDES : bibliothèque de guides à suivre (cases à cocher, classement, nœuds) =================
+   Chaque guide = des sections d'étapes. Chaque étape est un NŒUD : id unique, type (quest / skill / step),
+   besoins (needs : niveaux ou autres nœuds) et danger HC. Plus tard, l'optimiseur fusionnera les nœuds
+   de plusieurs guides pour trouver la meilleure route commune. */
+const GD_CATS={quetes:'📜 Quêtes',prayer:'🙏 Prière',agility:'🏃 Agilité',sailing:'⛵ Sailing',construction:'🔨 Construction',argent:'💰 Argent',combat:'⚔️ Combat',autre:'🗂️ Autre'};
+const GD_RISK={0:'',1:'<span class="pill" title="Risque HC faible">🟢</span>',2:'<span class="pill warn" title="Risque HC moyen">🟠 risque</span>',3:'<span class="pill warn" title="Risque HC élevé">🔴 danger HC</span>'};
+const gQ=(id,q,o={})=>Object.assign({id,kind:'quest',t:q,q},o), gSK=(id,s,l,o={})=>Object.assign({id,kind:'skill',t:`${SKFR[s]||s} ${l}`,skill:s,lvl:l},o), gST=(id,t,o={})=>Object.assign({id,kind:'step',t},o);
+const GUIDES=[
+ {id:'bearinda-quetes',title:'Bearinda : bilan des quêtes et route Perilous Moons',cat:'quetes',perso:'Bearinda',status:'ready',date:'2026-11-19',
+  goal:'Perilous Moons (priorité du compte) + Quest Points sans danger',
+  summary:'Relevé le 19/11 : 58/191 quêtes, 110 QP, total 840. Le vrai mur est le Slayer (15 → 48). Couleurs de la liste en jeu : vert = finie, jaune = commencée, rouge = faisable maintenant, gris = bloquée, orange = titres de sections.',
+  routes:{fast:'Twilight\'s Promise → Slayer 48 → Herblore 38 → Perilous Moons. Seules exceptions : Clock Tower et Demon Slayer (quelques minutes).',bal:'Comme « rapide », plus Nature Spirit, Making History et A Porcine of Interest (XP Slayer) pendant les pauses.',rich:'Ajoute les quêtes rouges rentables (Ghosts Ahoy, Tai Bwo Wannai Trio, One Small Favour…) puis les rapides : plus de QP et de déblocages, Moons plus tard.'},
+  doc:'https://claude.ai/artifact/MUHX7U2pQBPurBShzeyXFx',
+  sections:[
+   {h:'1. Finir les quêtes commencées (jaunes)',steps:[
+     gQ('clock','Clock Tower',{note:'Très court, 1 QP'}),gQ('demon','Demon Slayer',{note:'Silverlight',risk:1}),
+     gQ('nature','Nature Spirit',{note:'Prioritaire : ouvre Morytania (Mort Myre, druid pouch)',risk:1}),gQ('history','Making History',{note:'Que de la marche'}),
+     gQ('fisles','The Fremennik Isles',{needs:[{skill:'Construction',lvl:46}],risk:2,note:'Ice Troll King'}),
+     gQ('upass','Underground Pass',{needs:[{skill:'Ranged',lvl:25}],risk:3,note:'Pièges, chutes, Iban : pas maintenant'}),
+     gQ('rfd','Recipe for Disaster',{note:'Sous-quêtes au fil de l\'eau',risk:2})]},
+   {h:'2. Route Perilous Moons',steps:[
+     gQ('twilight','Twilight\'s Promise',{note:'Clé de Perilous Moons (seule condition : Children of the Sun, fait). Vérifie qu\'elle est rouge dans ta liste.'}),
+     gSK('hunt20','Hunter',20),gSK('fish20','Fishing',20),gSK('rc20','Runecraft',20),gSK('con10','Construction',10),
+     gSK('slay48','Slayer',48,{note:'Le vrai mur : tâches Vannaka / Chaeldar, hors Wilderness'}),
+     gSK('herb38','Herblore',38,{note:'Minimum pour le combat final'}),gSK('cook30','Cooking',30),
+     gQ('moons','Perilous Moons',{needs:['twilight','hunt20','fish20','rc20','con10','slay48','herb38','cook30'],risk:2,note:'Conseillé : combat 75, 60 Att/Str/Def'})]},
+   {h:'3. Quêtes rouges rentables',steps:[
+     gQ('porcine','A Porcine of Interest',{note:'XP Slayer : aide directement la route Moons',risk:1}),gQ('ghosts','Ghosts Ahoy',{note:'Ectophial : téléport illimité Morytania',needs:['nature']}),
+     gQ('taibwo','Tai Bwo Wannai Trio',{note:'Karambwans (nourriture combo)',risk:1}),gQ('osf','One Small Favour',{note:'Longue, requise partout'}),
+     gQ('troll','Troll Stronghold',{note:'Trollheim → Eadgar\'s Ruse, God Wars',risk:2}),gQ('mdaughter','Mountain Daughter',{note:'XP Prière',risk:2}),gQ('gdwarf','The Giant Dwarf',{note:'Ouvre Keldagrim'})]},
+   {h:'4. Quêtes rouges rapides (QP sans danger)',steps:['Pirate\'s Treasure','Vampyre Slayer','Below Ice Mountain','Fishing Contest','Rag and Bone Man I','Sea Slug','The Lost Tribe','The Forsaken Tower','The Queen of Thieves','Tale of the Righteous','A Soul\'s Bane','The Corsair Curse','The Golem','Shades of Mort\'ton'].map((q,i)=>gQ('r'+i,q))},
+   {h:'5. À voir avec Quest Helper (récentes)',steps:['The Ribbiting Tale of a Lily Pad Labour Dispute','Death on the Isle','A Shell of a Friend'].map((q,i)=>gQ('n'+i,q))},
+   {h:'6. À éviter pour l\'instant (même en rouge)',steps:[gQ('ds1','Dragon Slayer I',{risk:3,note:'Elvarg : antifire + anti-dragon shield obligatoires'}),gQ('haunted','Haunted Mine',{risk:3,note:'Treus Dayth tape fort'}),gQ('arrav','Shield of Arrav',{note:'Il faut un deuxième joueur'})]}]},
+ {id:'prayer-43',title:'Prière 43 (Protect from Melee)',cat:'prayer',perso:'',status:'soon',goal:'43 Prière : les 3 protections, indispensable en HC',ask:'Fais-moi le guide 📚 « Prière 43 » pour <perso> (niveau actuel ?), plus rentable / plus rapide, avec le coût en gp aux prix HC.'},
+ {id:'prayer-70',title:'Prière 70 (Piety)',cat:'prayer',perso:'',status:'soon',goal:'70 Prière + King\'s Ransom / Knight Waves pour Piety',ask:'Fais-moi le guide 📚 « Prière 70 » (Piety) pour <perso>, avec les quêtes à faire et le coût en os.'},
+ {id:'agility-99',title:'Agilité 99',cat:'agility',perso:'',status:'soon',goal:'De ton niveau à 99 : rooftops, marks of grace, Graceful',ask:'Fais-moi le guide 📚 « Agilité 99 » pour <perso>, rentable vs rapide, sans Wilderness.'},
+ {id:'sailing-200m',title:'Sailing 200 M XP',cat:'sailing',perso:'',status:'soon',goal:'99 puis 200 M XP en Sailing, avec le salvage et les crafts',ask:'Fais-moi le guide 📚 « Sailing 200 M XP » pour <perso>, avec les rations XP/planche du chantier naval.'},
+ {id:'construction-200m',title:'Construction 200 M XP',cat:'construction',perso:'',status:'soon',goal:'99 puis 200 M XP en Construction (kits de réparation, hull parts, POH)',ask:'Fais-moi le guide 📚 « Construction 200 M XP » pour <perso>, coût en gp/XP aux prix HC.'},
+ {id:'10bil',title:'10 milliards en un mois (by Claude)',cat:'argent',perso:'',status:'soon',goal:'Plan d\'argent sur les 15 comptes : flips, revente PNJ, packs, Sailing',ask:'Fais-moi le guide 📚 « 10 Bil richer in a month » pour mes 15 comptes, avec un objectif par semaine.'}];
+let gdSt=Object.assign({cat:'all',perso:'all',open:'bearinda-quetes',pins:['bearinda-quetes'],done:{},showSoon:true,newOpen:false},store.get('gdSt',{}));
+let myGuides=store.get('myGuides',[]);
+const gdAll=()=>GUIDES.concat(myGuides);
+const gdSave=()=>store.set('gdSt',gdSt);
+const gdSteps=g=>(g.sections||[]).flatMap(s=>s.steps);
+const gdMatch=g=>g.perso&&profile&&profile.name&&norm(profile.name)===norm(g.perso);
+function gdLvl(s){return lvlOf(pxp(s))}
+/* état d'un nœud : fait (coché ou détecté), bloqué (besoin manquant), libre */
+function gdNode(g,st){const man=(gdSt.done[g.id]||{})[st.id];const auto=gdMatch(g)&&(st.kind==='quest'?questDone(st.q):st.kind==='skill'&&profile.xp&&profile.xp[st.skill]!=null?gdLvl(st.skill)>=st.lvl:false);
+  const done=man===true||(man!==false&&auto);
+  const miss=[];(st.needs||[]).forEach(n=>{if(typeof n==='string'){const o=gdSteps(g).find(x=>x.id===n);if(o&&!gdNode(g,o).done)miss.push(o.t)}
+    else if(gdMatch(g)&&profile.xp&&profile.xp[n.skill]!=null&&gdLvl(n.skill)<n.lvl)miss.push(`${SKFR[n.skill]||n.skill} ${gdLvl(n.skill)}/${n.lvl}`)});
+  return {done,auto:auto&&man==null,raw:!!auto,miss}}
+function gdProg(g){const s=gdSteps(g);if(!s.length)return null;const d=s.filter(x=>gdNode(g,x).done).length;return {d,n:s.length,p:Math.round(d/s.length*100)}}
+function gdNext(g,n=3){return gdSteps(g).map(st=>({st,o:gdNode(g,st)})).filter(x=>!x.o.done&&!x.o.miss.length&&(x.st.risk||0)<3).slice(0,n)}
+function renderGuides(){const host=hostBox();
+  $('#intro').textContent='Tes guides, rangés et suivis : coche les étapes au fur et à mesure (sauvegardé dans ce navigateur). Si ton perso est chargé dans « Progression » (WikiSync), les quêtes et niveaux se cochent tout seuls. Chaque étape est un nœud : un jour, l\'optimiseur les croisera pour trouver la meilleure route.';
+  const all=gdAll(),persos=[...new Set(all.map(g=>g.perso).filter(Boolean))];
+  let L=all.filter(g=>(gdSt.cat==='all'||g.cat===gdSt.cat)&&(gdSt.perso==='all'||g.perso===gdSt.perso||!g.perso)&&(gdSt.showSoon||g.status!=='soon'));
+  L.sort((a,b)=>(gdSt.pins.includes(b.id)-gdSt.pins.includes(a.id))||((a.status==='soon')-(b.status==='soon'))||a.title.localeCompare(b.title));
+  const card=g=>{const p=gdProg(g);return `<button class="gdcard${gdSt.open===g.id?' on':''}${g.status==='soon'?' soon':''}" data-gdopen="${esc(g.id)}">
+    <span class="small mut">${GD_CATS[g.cat]||GD_CATS.autre}${g.perso?' · '+esc(g.perso):''}${gdSt.pins.includes(g.id)?' · 📌':''}</span><b>${esc(g.title)}</b>
+    ${g.status==='soon'?'<span class="pill">à venir</span>':p?`<span class="gdbar"><i style="width:${p.p}%"></i></span><span class="small mut">${p.d}/${p.n} étapes · ${p.p} %</span>`:''}</button>`};
+  /* « à faire maintenant » : nœuds libres des guides épinglés (première fusion de routes) */
+  const now=gdSt.pins.map(id=>all.find(g=>g.id===id)).filter(g=>g&&g.status!=='soon').flatMap(g=>gdNext(g,3).map(x=>({g,...x})));
+  let h=`<section class="box"><div class="gdtools"><label>Catégorie <select data-gdf="cat"><option value="all">Toutes</option>${Object.entries(GD_CATS).map(([k,l])=>`<option value="${k}" ${gdSt.cat===k?'selected':''}>${l}</option>`).join('')}</select></label>
+    <label>Perso <select data-gdf="perso"><option value="all">Tous</option>${persos.map(p=>`<option ${gdSt.perso===p?'selected':''}>${esc(p)}</option>`).join('')}</select></label>
+    <label><input type="checkbox" data-gdf="showSoon" ${gdSt.showSoon?'checked':''}> Montrer les guides à venir</label>
+    <button class="btn" data-gda="new">＋ Créer un guide</button></div>
+    ${gdSt.newOpen?`<div class="gdnew"><input id="gdnT" placeholder="Titre (ex. Prière 43 pour Bear Brown)"> <input id="gdnP" placeholder="Perso (facultatif)"> <select id="gdnC">${Object.entries(GD_CATS).map(([k,l])=>`<option value="${k}">${l}</option>`).join('')}</select>
+      <textarea id="gdnS" rows="5" placeholder="Une étape par ligne. Une ligne qui commence par # devient un titre de section."></textarea><button class="btn" data-gda="create">Créer</button> <button class="btn" data-gda="new">Annuler</button></div>`:''}
+    ${now.length?`<div class="gdnow"><b>🧭 À faire maintenant</b> <span class="small mut">(étapes libres de tes guides épinglés, sans danger HC élevé)</span><ul class="list">${now.map(x=>`<li><span><label><input type="checkbox" data-gdck="${esc(x.g.id)}|${esc(x.st.id)}"> ${esc(x.st.t)}</label> <span class="small mut">— ${esc(x.g.title)}</span></span></li>`).join('')}</ul></div>`:''}
+    <div class="gdcards">${L.map(card).join('')||'<p class="mut">Aucun guide pour ces filtres.</p>'}</div></section>`;
+  const g=all.find(x=>x.id===gdSt.open);
+  if(g){const pin=gdSt.pins.includes(g.id),p=gdProg(g);
+    h+=`<section class="box"><div class="gdhead"><h3>${esc(g.title)}</h3><span><button class="btn" data-gda="pin">${pin?'📌 Désépingler':'📌 Épingler'}</button>${g.custom?' <button class="btn" data-gda="del">🗑 Supprimer</button>':''}${p?' <button class="btn" data-gda="reset">↺ Décocher tout</button>':''}</span></div>
+    <p class="small mut">${GD_CATS[g.cat]||''}${g.perso?' · perso : <b>'+esc(g.perso)+'</b>':''}${g.date?' · '+esc(g.date):''}${g.goal?' · objectif : '+esc(g.goal):''}${gdMatch(g)?' · <span class="gold">✔ coches automatiques (WikiSync)</span>':g.perso?` · charge « ${esc(g.perso)} » dans Progression pour cocher tout seul`:''}</p>
+    ${g.summary?`<p>${esc(g.summary)}</p>`:''}
+    ${g.routes?`<div class="gdroutes"><div><b>⚡ Plus rapide</b><br>${esc(g.routes.fast)}</div><div><b>⚖️ Équilibré (conseillé)</b><br>${esc(g.routes.bal)}</div><div><b>💰 Plus rentable</b><br>${esc(g.routes.rich)}</div></div>`:''}
+    ${g.doc?`<p class="small"><a href="${esc(g.doc)}" target="_blank" rel="noopener">📄 Version document (avec explications)</a></p>`:''}`;
+    if(g.status==='soon')h+=`<p>Ce guide n'est pas encore écrit. Pour le créer, colle ceci à Claude dans le projet HC Toolkit :</p><p class="gdask">${esc(g.ask||'')}</p>`;
+    (g.sections||[]).forEach(s=>{h+=`<h4 class="gdh4">${esc(s.h)}</h4><ul class="list gdsteps">${s.steps.map(st=>{const o=gdNode(g,st);
+      return `<li class="${o.done?'done':''}${o.miss.length?' lock':''}"><span><label><input type="checkbox" data-gdck="${esc(g.id)}|${esc(st.id)}" ${o.done?'checked':''}> ${st.kind==='skill'?'📈 ':st.kind==='quest'?'📜 ':''}${esc(st.t)}</label> ${GD_RISK[st.risk||0]}${o.auto?' <span class="pill gold" title="Détecté via WikiSync">auto</span>':''}${o.miss.length?` <span class="pill warn">🔒 ${esc(o.miss.join(', '))}</span>`:''}${st.note?` <span class="small mut">— ${esc(st.note)}</span>`:''}</span></li>`}).join('')}</ul>`});
+    h+=`</section>`}
+  host.innerHTML=h}
+VIEWS.guides={label:'Guides 📚',custom:true,render:()=>renderGuides()};
+MOVES.guides=['📚 Choisis un guide','✅ Coche au fur et à mesure','🧭 Suis « À faire maintenant »'];
+NEWTABS.add('guides');
+{const i=GROUPS.findIndex(g=>g[0]==='plan');GROUPS.splice(i+1,0,['guides','📚 Guides',['guides']])}
+document.addEventListener('click',e=>{if(tab!=='guides')return;const t=e.target.closest('[data-gdopen],[data-gda]');if(!t)return;
+  if(t.dataset.gdopen){gdSt.open=t.dataset.gdopen}
+  else{const a=t.dataset.gda,id=gdSt.open;
+    if(a==='pin'){gdSt.pins=gdSt.pins.includes(id)?gdSt.pins.filter(x=>x!==id):gdSt.pins.concat(id)}
+    else if(a==='reset'){if(!confirmSafe('Décocher toutes les étapes de ce guide ?'))return;delete gdSt.done[id]}
+    else if(a==='new'){gdSt.newOpen=!gdSt.newOpen}
+    else if(a==='del'){if(!confirmSafe('Supprimer ce guide ?'))return;myGuides=myGuides.filter(g=>g.id!==id);store.set('myGuides',myGuides);gdSt.open=GUIDES[0].id}
+    else if(a==='create'){const T=($('#gdnT').value||'').trim();if(!T)return;const lines=($('#gdnS').value||'').split('\n').map(x=>x.trim()).filter(Boolean);
+      const sections=[];let cur=null;lines.forEach((l,i)=>{if(l.startsWith('#')){cur={h:l.replace(/^#+\s*/,''),steps:[]};sections.push(cur)}else{if(!cur){cur={h:'Étapes',steps:[]};sections.push(cur)}cur.steps.push(gST('s'+i,l))}});
+      const g={id:'my-'+Date.now(),title:T,perso:($('#gdnP').value||'').trim(),cat:$('#gdnC').value,status:'ready',custom:true,date:new Date().toISOString().slice(0,10),sections};
+      myGuides.push(g);store.set('myGuides',myGuides);gdSt.open=g.id;gdSt.newOpen=false}}
+  gdSave();render()});
+document.addEventListener('change',e=>{if(tab!=='guides')return;const t=e.target;
+  if(t.dataset.gdck){const [gid,sid]=t.dataset.gdck.split('|');const g=gdAll().find(x=>x.id===gid);const st=g&&gdSteps(g).find(x=>x.id===sid);if(!st)return;
+    const o=gdNode(g,st);const m=gdSt.done[gid]=gdSt.done[gid]||{};
+    if(t.checked){if(o.raw)delete m[sid];else m[sid]=true}else m[sid]=false;gdSave();render()}
+  else if(t.dataset.gdf){gdSt[t.dataset.gdf]=t.type==='checkbox'?t.checked:t.value;gdSave();render()}});
+function confirmSafe(m){try{return window.confirm(m)}catch(e){return true}}
+{const st=document.createElement('style');st.textContent=`.gdtools{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:10px}
+.gdcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
+.gdcard{display:flex;flex-direction:column;gap:4px;align-items:flex-start;text-align:left;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--panel,var(--chip));color:var(--fg);cursor:pointer;font-size:13px}
+.gdcard.on{border-color:var(--gold)}.gdcard.soon{opacity:.7}
+.gdbar{display:block;width:100%;height:6px;border-radius:3px;background:var(--line);overflow:hidden}.gdbar i{display:block;height:100%;background:var(--gold)}
+.gdnow{border:1px dashed var(--gold);border-radius:8px;padding:8px 12px;margin:0 0 12px}
+.gdhead{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}.gdhead h3{margin:0}
+.gdroutes{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px;margin:8px 0;font-size:13px}.gdroutes>div{border:1px solid var(--line);border-radius:8px;padding:8px}
+.gdh4{margin:14px 0 2px}.gdsteps li.done label{text-decoration:line-through;opacity:.6}.gdsteps li.lock label{opacity:.75}
+.gdask{font-family:monospace;font-size:12.5px;padding:8px;border:1px solid var(--line);border-radius:6px;user-select:all}
+.gdnew{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}.gdnew textarea{width:100%}`;document.head.appendChild(st)}
+
 /* v1.0 : démarrage du portail */
 try{const qp=new URLSearchParams(location.search);if(qp.get('panel')==='1')store.set('compact',true);if(qp.get('panel')==='0')store.set('compact',false);if(qp.get('world')&&qp.get('world')!==WORLD&&/^(hc|osrs)$/.test(qp.get('world'))){localStorage.setItem('hcx_world',JSON.stringify(qp.get('world')));location.replace(location.pathname+(qp.get('panel')?'?panel='+qp.get('panel'):''))}}catch(e){}
 applyCompact();if(WORLD==='osrs')document.body.classList.add('osrs');
