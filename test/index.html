@@ -3552,7 +3552,8 @@ function usesRows(id){const E=eng(),m=MAP[id];if(!m)return[];const k=m.name.toLo
     const tk=r.ticks?r.ticks+(e&&e.kind==='alch'?5*r.oq:0):0; /* l'alchimie prend aussi 5 ticks par objet */
     const perH=prof!=null&&tk?prof*3600/(tk*.6):null;
     const lv=(r.sk||[]).map(s=>({n:s.n,l:s.l,xp:s.xp,have:hasP&&profile.xp[s.n]!=null?lvlOf(pxp(s.n)):null}));
-    rows.push({i,r,oid,mats,cost,e,rev,prof,perH,lv,lock:lv.some(s=>s.have!=null&&s.have<s.l)})});
+    let perWorld=null;if(e&&e.kind==='npc'&&e.shop&&e.shop.delta&&prof!=null&&prof>0){const step=((MAP[oid]||{}).value||0)*e.shop.delta/1000;if(step>0)perWorld=Math.max(1,Math.floor(prof/r.oq/step)+1)}
+    rows.push({i,r,oid,mats,cost,e,rev,prof,perH,perWorld,lv,lock:lv.some(s=>s.have!=null&&s.have<s.l)})});
   return rows.sort((a,b)=>(b.prof??-1e15)-(a.prof??-1e15))}
 const usesSrc=s=>!s?'<span class="mut">N/A</span>':s.kind==='ge'?'GE':s.kind==='shop'?'🏪 '+esc(s.where):s.kind==='craft'?'🔨 fabriqué':'pièces';
 function usesHtml(id){const all=usesRows(id),m=MAP[id];if(!m)return '';const hasP=all.some(r=>r.lv.some(s=>s.have!=null));
@@ -3567,10 +3568,10 @@ function usesHtml(id){const all=usesRows(id),m=MAP[id];if(!m)return '';const has
     const xp=x.lv.reduce((a,s)=>a+(s.xp||0),0);
     return `<details class="use${x.prof!=null&&x.prof<=0?' neg':''}${x.lock?' lock':''}"><summary><span class="use-n">${om?`<img src="${icon(om)}" alt="">`:''}<b>${esc(r.out)}</b>${r.oq>1?' ×'+r.oq:''}${r.sub?` <span class="small mut">${esc(r.sub)}</span>`:''}</span>
       <span class="use-p ${x.prof==null?'mut':cls(x.prof)}">${x.prof==null?'N/A':(x.prof>0?'+':'')+gp(x.prof)}<small> / fab.</small></span>
-      <span class="small mut use-l">${lv}${x.perH!=null?` · ≈ ${gp(x.perH)}/h${x.e&&x.e.kind==='alch'?' (alch compris)':''}`:''}</span></summary>
+      <span class="small mut use-l">${lv}${x.perH!=null?` · ≈ ${gp(x.perH)}/h${x.e&&x.e.kind==='alch'?' (alch compris)':' (fabrication seule)'}`:''}${x.perWorld?` · <span class="warn-t">🔁 ≈ ${x.perWorld} rentables par monde au PNJ</span>`:''}</span></summary>
       <div class="tablewrap"><table class="eqt"><thead><tr><th class="l">Pour ${nf.format(N)} fabrication${N>1?'s':''}</th><th>Qté</th><th class="l">Source</th><th>Prix u.</th><th>Total</th></tr></thead><tbody>${lines.join('')}</tbody></table></div>
       <div class="kv use-kv"><div><span>Coût total</span><b>${x.cost!=null?gpc(x.cost*N):'N/A'}</b></div><div><span>Produits</span><b>${nf.format(r.oq*N)}</b></div>
-       <div><span>Meilleure sortie</span><b class="small">${x.e?esc(exitTxt(x.e)):'N/A'}</b></div><div><span>Revente totale</span><b>${x.rev!=null?gpc(x.rev*N):'N/A'}</b></div>
+       <div><span>Meilleure sortie</span><b class="small">${x.e?esc(exitTxt(x.e)):'N/A'}</b></div><div><span>Revente totale</span><b>${x.rev!=null?gpc(x.rev*N):'N/A'}</b>${x.perWorld&&x.perWorld<r.oq*N?`<small class="mut">si tout vendu au 1ᵉʳ prix : le PNJ baisse à chaque objet, change de monde tous les ≈ ${x.perWorld}</small>`:''}</div>
        <div><span>Profit total</span><b class="${x.prof!=null?cls(x.prof):''}">${x.prof!=null?gp(x.prof*N):'N/A'}</b></div>${xp?`<div><span>XP totale</span><b>${gp(xp*N)}</b></div>`:''}${r.ticks?`<div><span>Temps</span><b>≈ ${fmt1(r.ticks*.6*N/60)} min</b></div>`:''}</div>
       ${r.fac?`<p class="small mut">Il faut aussi : ${esc(r.fac)}</p>`:''}<button class="btn" data-userec="${x.i}">📋 Détail complet de la recette</button></details>`};
   return `<h3>🔨 Ce que tu peux fabriquer avec (${all.length} recette${all.length>1?'s':''}, ${good} rentable${good>1?'s':''})</h3>
