@@ -363,7 +363,7 @@ body.compact .atl-mods{grid-template-columns:1fr}
 <body>
 <header id="hd">
   <div class="bar">
-    <div class="logo"><button class="logo-b" data-tab="home" title="Accueil"><span class="logo-mark" aria-hidden="true">HC</span><span class="logo-t">HC Toolkit</span></button><small class="logo-s">Hardcore Worlds · <button class="linkish" id="changelog" title="Nouveautés">v1.7</button></small></div>
+    <div class="logo"><button class="logo-b" data-tab="home" title="Accueil"><span class="logo-mark" aria-hidden="true">HC</span><span class="logo-t">HC Toolkit</span></button><small class="logo-s">Hardcore Worlds · <button class="linkish" id="changelog" title="Nouveautés">v1.7.1</button></small></div>
     <div class="search"><input id="q" type="search" placeholder="Rechercher un objet…   ( / )" autocomplete="off"><button class="btn kbtn" id="palBtn" title="Aller n'importe où (Ctrl+K)">⌘K</button></div>
     <div class="ctrl">
       <span class="status" id="status">Chargement…</span>
@@ -2065,6 +2065,7 @@ function setLive(sec){liveSec=+sec;store.set('liveSec',liveSec);clearInterval(li
 function favRows(){const ids=[...favs].filter(id=>MAP[id]);hcwWant(ids);wantSpark(ids);return ids.map(id=>base(id))}
 
 const CHANGELOG=`<div class="dh"><h2>Nouveautés</h2><button class="btn" id="close">Fermer</button></div>
+ <div class="box"><h3>v1.7.1 · 20 novembre 2026</h3><ul class="list"><li><span><b>🔨 Ce que tu peux fabriquer avec</b> (dans la fiche de chaque objet) : toutes les recettes qui l'utilisent, classées par profit, avec les niveaux requis (🔒 si ton perso ne les a pas) et, pour chacune, la liste complète à acheter pour N fabrications (GE, PNJ ou fabriqué toi-même), coût, revente, profit, XP et temps.</span></li></ul></div>
  <div class="box"><h3>v1.7 « Arène & Futur » · 20 novembre 2026</h3><ul class="list">
   <li><span><b>🎯 Entraînement boss</b> (⚔️ Combat & butin, bêta) : <b>TzTok-Jad</b>, <b>les 3 Jads</b> de l'Inferno (écart réglable), <b>Corrupted Hunllef</b> (4 attaques par style, change d'arme après 6 coups) et <b>TzKal-Zuk</b> (reste derrière le bouclier, phase Jad). Horloge réelle (0,6 s), livre de prières à la vraie place, Q / W / E, records et historique. Aucun son.</span></li>
   <li><span><b>😴 AFK</b> (barre du haut) : 1 clic = ton dernier choix (boss, gros mouvements ou flips) ; ▾ pour changer. Lien direct <code>?afk=1</code>.</span></li>
@@ -2161,7 +2162,7 @@ function dossierHtml(id){let D;try{D=eng().dossier(id)}catch(e){return ''}if(!D)
    <div class="pgrid" style="gap:10px;margin-top:8px"><div><b>Qui le vend</b>${li(D.sells,x=>`<li data-sw="${esc(x.shop)}" style="cursor:pointer"><span class="small">${esc(x.shop)}${x.dlg?' <span class="mut">(dialogue)</span>':''}</span><span>${gp(x.price)} · stock ${x.stock===Infinity?'∞':x.stock}</span></li>`)}</div>
     <div><b>Qui le rachète</b>${li(D.buys,x=>`<li data-sw="${esc(x.shop)}" style="cursor:pointer"><span class="small">${esc(x.shop)}</span><span>${gp(x.buy)}${x.delta?' <span class="mut">−'+String(x.delta/10).replace('.',',')+' %/u</span>':' <span class="mut">fixe</span>'}</span></li>`)}</div>
     <div><b>Fabriqué à partir de</b>${li(D.made,recLine)}</div>
-    <div><b>Sert à fabriquer</b> <span class="mut">(gain par unité produite)</span>${li(D.used,useLine)}</div></div></div>`}
+    <div><b>Sert à fabriquer</b> <span class="mut">(détail plus bas : 🔨)</span>${li(D.used,useLine)}</div></div></div>`}
 
 /* ================= Fenêtres flottantes (plusieurs à la fois, déplaçables) ================= */
 let WZ=60;const WINS={};
@@ -2221,6 +2222,7 @@ async function openItem(id){
    ${(()=>{const o=OS_LAT[r.id];if(!o)return '';const os=o.low||o.high,br=bondRatio(),ra=r.sell?os/r.sell:null;
      return `<div><span>Prix OSRS normal</span><b>${gp(os)}</b></div><div><span>Ratio OSRS / HC</span><b>${ra?ra.toFixed(1).replace('.',',')+'×':'–'}</b></div><div><span>vs bond (${br?br.toFixed(1).replace('.',','):'?'}×)</span><b class="${ra&&br?(ra>br?'up':'down'):''}">${ra&&br?(ra/br).toFixed(2).replace('.',',')+'×':'–'}</b></div>`})()}</div>
   ${dossierHtml(r.id)}
+  <div class="box" id="uses">${usesHtml(r.id)}</div>
   <div class="box" id="book"><h3>Carnet d'ordres (HCW Tool Kit)</h3><p class="mut">Chargement…</p></div>
   <div class="seg" id="look">${['6h','24h','7d','30d','6m'].map(k=>`<button data-look="${k}" class="${k===curLook?'on':''}">${k.replace('d',' j').replace('m',' mois').replace('h',' h')}</button>`).join('')}</div>
   <div class="legend"><span><i style="background:var(--up)"></i>Prix haut (vente)</span><span><i style="background:var(--down)"></i>Prix bas (achat)</span><span><i style="background:var(--muted);opacity:.5"></i>Volume</span></div>
@@ -3536,6 +3538,52 @@ document.addEventListener('change',e=>{if(tab!=='futur'||e.target.id!=='futIn')r
 document.addEventListener('keydown',e=>{if(tab!=='futur'||e.target.id!=='futIn'||e.key!=='Enter')return;const id=BYNAME[(e.target.value||'').trim().toLowerCase()];if(id)futPick(id)});
 {const st=document.createElement('style');st.textContent=`.fut-ctl{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center}.fut-ctl input{min-width:220px}.fut-g{display:inline-flex;gap:4px;flex-wrap:wrap}
 .fut-head{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.fut-head h3{margin:0}.fut-head img{height:28px}`;document.head.appendChild(st)}
+
+/* ================= v1.7.1 🔨 Ce que tu peux fabriquer avec un objet (dans sa fiche) =================
+   Toutes les recettes qui utilisent l'objet, sans en cacher aucune : profit par fabrication, gp/h, niveaux requis (🔒 si le perso chargé
+   ne les a pas), et la liste complète à acheter pour N fabrications (source la moins chère : GE, PNJ ou fabriqué soi-même). */
+let usesN=store.get('usesN',100),usesAll=false,usesMine=store.get('usesMine',false);
+function usesRows(id){const E=eng(),m=MAP[id];if(!m)return[];const k=m.name.toLowerCase(),seen=new Set(),rows=[];
+  const hasP=typeof profile!=='undefined'&&profile&&profile.xp;
+  (E.usedIn[k]||[]).forEach(i=>{const r=RECIPES[i];if(!r||r.oneOff||!r.out)return;const sig=r.out+'|'+r.mats.map(x=>x.q+x.n).join(',');if(seen.has(sig))return;seen.add(sig);
+    const oid=BYNAME[r.out.toLowerCase()];const mats=r.mats.map(x=>({n:x.n,q:x.q,s:E.src(x.n,1),id:BYNAME[x.n.toLowerCase()]}));
+    const ok=mats.every(x=>x.s);const cost=ok?mats.reduce((a,x)=>a+x.s.p*x.q,0):null;
+    const e=oid?(E.exits(oid)[0]||null):null;const rev=e?e.p*r.oq:null;const prof=rev!=null&&cost!=null?rev-cost:null;
+    const perH=prof!=null&&r.ticks?prof*3600/(r.ticks*.6):null;
+    const lv=(r.sk||[]).map(s=>({n:s.n,l:s.l,xp:s.xp,have:hasP&&profile.xp[s.n]!=null?lvlOf(pxp(s.n)):null}));
+    rows.push({i,r,oid,mats,cost,e,rev,prof,perH,lv,lock:lv.some(s=>s.have!=null&&s.have<s.l)})});
+  return rows.sort((a,b)=>(b.prof??-1e15)-(a.prof??-1e15))}
+const usesSrc=s=>!s?'<span class="mut">N/A</span>':s.kind==='ge'?'GE':s.kind==='shop'?'🏪 '+esc(s.where):s.kind==='craft'?'🔨 fabriqué':'pièces';
+function usesHtml(id){const all=usesRows(id),m=MAP[id];if(!m)return '';const hasP=all.some(r=>r.lv.some(s=>s.have!=null));
+  if(!all.length)return `<h3>🔨 Ce que tu peux fabriquer avec</h3><p class="mut">Aucune recette du wiki n'utilise ${esc(m.name)}.</p>`;
+  let L=usesMine&&hasP?all.filter(r=>!r.lock):all;const n=L.length;if(!usesAll)L=L.slice(0,8);const N=Math.max(1,+usesN||1);
+  const good=all.filter(r=>r.prof>0).length;
+  const row=x=>{const r=x.r,om=x.oid&&MAP[x.oid];
+    const lv=x.lv.map(s=>`<span class="${s.have!=null&&s.have<s.l?'down':''}">${esc(SKFR[s.n]||s.n)} ${s.l}${s.have!=null&&s.have<s.l?' 🔒 ('+s.have+')':''}</span>`).join(', ')||'aucun niveau';
+    const lines=[];x.mats.forEach(mt=>{const s=mt.s,q=mt.q*N,unit=s?s.p:null;
+      lines.push(`<tr><td class="l">${mt.id&&MAP[mt.id]?`<img src="${icon(MAP[mt.id])}" alt="">`:''}${esc(mt.n)}${mt.n.toLowerCase()===m.name.toLowerCase()?' <span class="pill gold">cet objet</span>':''}</td><td>${nf.format(q)}</td><td class="l small">${usesSrc(s)}</td><td>${unit!=null?gp(unit):'<span class="mut">N/A</span>'}</td><td><b>${unit!=null?gp(unit*q):'–'}</b></td></tr>`);
+      if(s&&s.kind==='craft')s.steps.forEach(st=>lines.push(`<tr class="sub"><td class="l">↳ ${esc(st.n)}</td><td>${nf.format(st.q*q/(RECIPES[s.rec].oq||1))}</td><td class="l small">${usesSrc(st.s)}</td><td>${gp(st.s.p)}</td><td class="mut">(inclus)</td></tr>`))});
+    const xp=x.lv.reduce((a,s)=>a+(s.xp||0),0);
+    return `<details class="use${x.prof!=null&&x.prof<=0?' neg':''}${x.lock?' lock':''}"><summary><span class="use-n">${om?`<img src="${icon(om)}" alt="">`:''}<b>${esc(r.out)}</b>${r.oq>1?' ×'+r.oq:''}${r.sub?` <span class="small mut">${esc(r.sub)}</span>`:''}</span>
+      <span class="use-p ${x.prof==null?'mut':cls(x.prof)}">${x.prof==null?'N/A':(x.prof>0?'+':'')+gp(x.prof)}<small> / fab.</small></span>
+      <span class="small mut use-l">${lv}${x.perH!=null?` · ≈ ${gp(x.perH)}/h`:''}</span></summary>
+      <div class="tablewrap"><table class="eqt"><thead><tr><th class="l">Pour ${nf.format(N)} fabrication${N>1?'s':''}</th><th>Qté</th><th class="l">Source</th><th>Prix u.</th><th>Total</th></tr></thead><tbody>${lines.join('')}</tbody></table></div>
+      <div class="kv use-kv"><div><span>Coût total</span><b>${x.cost!=null?gpc(x.cost*N):'N/A'}</b></div><div><span>Produits</span><b>${nf.format(r.oq*N)}</b></div>
+       <div><span>Meilleure sortie</span><b class="small">${x.e?esc(exitTxt(x.e)):'N/A'}</b></div><div><span>Revente totale</span><b>${x.rev!=null?gpc(x.rev*N):'N/A'}</b></div>
+       <div><span>Profit total</span><b class="${x.prof!=null?cls(x.prof):''}">${x.prof!=null?gp(x.prof*N):'N/A'}</b></div>${xp?`<div><span>XP totale</span><b>${gp(xp*N)}</b></div>`:''}${r.ticks?`<div><span>Temps</span><b>≈ ${fmt1(r.ticks*.6*N/60)} min</b></div>`:''}</div>
+      ${r.fac?`<p class="small mut">Il faut aussi : ${esc(r.fac)}</p>`:''}<button class="btn" data-userec="${x.i}">📋 Détail complet de la recette</button></details>`};
+  return `<h3>🔨 Ce que tu peux fabriquer avec (${all.length} recette${all.length>1?'s':''}, ${good} rentable${good>1?'s':''})</h3>
+   <div class="use-ctl"><label>Pour <input type="number" id="usesN" min="1" value="${N}" style="width:80px"> fabrications</label>${hasP?`<label><input type="checkbox" id="usesMine" ${usesMine?'checked':''}> Seulement ce que mon perso peut faire</label>`:'<span class="small mut">Charge ton perso dans Progression pour voir les 🔒 niveaux manquants.</span>'}</div>
+   <p class="small mut">Classé par profit. Clique une recette pour la liste complète à acheter (source la moins chère : GE, PNJ ou à fabriquer toi-même). Rien n'est caché : sans prix → N/A.</p>
+   ${L.map(row).join('')}${n>L.length?`<button class="btn" data-usesall="1">Afficher tout (${n})</button>`:''}`}
+function usesRefresh(){const b=$('#uses');if(b&&curItem!=null)b.innerHTML=usesHtml(curItem)}
+document.addEventListener('click',e=>{const t=e.target.closest('[data-userec],[data-usesall]');if(!t)return;
+  if(t.dataset.usesall){usesAll=true;usesRefresh();return}showRecipe(RECIPES[+t.dataset.userec])});
+document.addEventListener('change',e=>{if(e.target.id==='usesN'){usesN=Math.max(1,parseInt(e.target.value)||1);store.set('usesN',usesN);const op=[...document.querySelectorAll('#uses details[open]')].map(d=>[...d.parentNode.children].indexOf(d));usesRefresh();op.forEach(i=>{const d=$('#uses').children[i];if(d)d.open=true})}
+  else if(e.target.id==='usesMine'){usesMine=e.target.checked;store.set('usesMine',usesMine);usesRefresh()}});
+{const st=document.createElement('style');st.textContent=`.use{border:1px solid var(--line);border-radius:6px;margin:6px 0;background:var(--chip)}.use>summary{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center;padding:6px 10px;cursor:pointer}
+.use>summary img,.use td img{height:22px;vertical-align:middle;margin-right:4px}.use-n{flex:1 1 180px}.use-p{font-weight:600}.use-l{flex-basis:100%;max-width:none}.use>div,.use>p,.use>button{margin:6px 10px}.use>button{margin-bottom:10px}
+.use.neg>summary{opacity:.6}.use.lock>summary .use-n{opacity:.7}.use tr.sub td{font-size:12px;color:var(--muted)}.use-kv{margin:8px 10px}.use-ctl{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center}`;document.head.appendChild(st)}
 
 /* v1.0 : démarrage du portail */
 try{const qp=new URLSearchParams(location.search);if(qp.get('panel')==='1')store.set('compact',true);if(qp.get('panel')==='0')store.set('compact',false);if(qp.get('world')&&qp.get('world')!==WORLD&&/^(hc|osrs)$/.test(qp.get('world'))){localStorage.setItem('hcx_world',JSON.stringify(qp.get('world')));location.replace(location.pathname+(qp.get('panel')?'?panel='+qp.get('panel'):''))}}catch(e){}
