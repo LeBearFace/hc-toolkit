@@ -1917,7 +1917,7 @@ function vtPacks(){const S=vtS(),M=VT_MODES[S.mode]||VT_MODES.bal,W=Math.max(1,S
   const out=[];
   for(const shop in by){const seen=new Set();let items=[];
     by[shop].forEach(x=>{const id=BYNAME[x.item.toLowerCase()];const m=id&&MAP[id];if(!m||!m.value||seen.has(id)||id==BOND)return;seen.add(id);
-      const P=vtPrice(id,M.patient);if(!P)return;const d=D24[id]||{};
+      const P=vtPrice(id,M.patient);if(!P)return;const d=D24[id]||{};if(suspect(base(id)))return; // prix d'un échange isolé : pas dans un pack
       const first=Math.max(x.buy,Math.floor(m.value*glovePct(shop,0)/100));const p1=first-P;if(p1<50)return; // moins de 50 gp : pas la peine de l'acheter
       const pct=first/m.value*100,chg=(x.delta||0)/10,fixed=!chg;const seq=[];
       if(fixed)seq.push(p1);else for(let k=0;k<200;k++){const p=Math.floor(m.value*Math.max(10,pct-k*chg)/100);const g=p-P;if(g<=0||(k>0&&g<p1*M.floor))break;seq.push(g)}
@@ -1970,7 +1970,7 @@ function renderHome(){if(settings.homeClassic){renderHomeClassic();return}
   </section>`;
   if(S.kinds.pack){h+=`<section><div class="h2s"><h3>🎒 Packs PNJ <span class="mut small">· un marchand, plusieurs objets, ${S.W} monde${S.W>1?'s':''}</span></h3><button class="linkish" data-tab="tour">classement complet →</button></div>`;
     h+=packs.length?`<div class="vt-grid">${packs.slice(0,9).map((p,i)=>`<article class="vt-card" data-vtp="${i}" tabindex="0">
-      <header><b>${esc(p.shop)}</b>${i===0?'<span class="pill gold">⭐ conseillé</span>':''}</header>
+      <header><b>${esc(p.shop.replace(/\.$/,''))}</b>${i===0?'<span class="pill gold">⭐ conseillé</span>':''}</header>
       <div class="vt-loc small mut">${esc(p.loc||'')}</div>
       <div class="vt-big up">+${gp(p.profit)}</div>
       <div class="vt-sub small">${p.fixed?'prix fixe, pas besoin de changer de monde':`≈ +${gp(p.perWorld)} par monde · ${p.wmax} monde${p.wmax>1?'s':''}`}</div>
@@ -1998,7 +1998,7 @@ function vtPackWin(p){const S=vtS(),M=VT_MODES[S.mode]||VT_MODES.bal;
    <h3 class="wt">2. Revends à ${esc(p.shop)}</h3><p class="small">${p.fixed?'Prix fixe : vends tout dans le même monde.':`Vends la quantité « par monde », puis change de monde (${p.wmax} au total). Le prix remonte dans chaque nouveau monde.`}</p>
    <p class="small"><button class="linkish" id="vtCopy">📋 Copier la liste d'achat</button> · <button class="linkish" data-sw="${esc(p.shop)}">📍 Carte et stock du magasin</button> <span id="vtCopyMsg" class="mut"></span></p>
    <details class="accd" open><summary>📍 Accès et prérequis${p.loc?' — '+esc(p.loc):''}</summary><div id="vtAcc"></div></details>`;
-  const w=openWin('vtp:'+p.shop,'🎒 Pack '+p.shop,html);fillAccess(p.shop,w.querySelector('#vtAcc'));
+  const w=openWin('vtp:'+p.shop,'🎒 Pack '+p.shop.replace(/\.$/,''),html);fillAccess(p.shop,w.querySelector('#vtAcc'));
   w.querySelector('#vtCopy').onclick=()=>{const t=`Pack PNJ — ${p.shop}\n`+p.items.map(x=>`${x.Q} × ${x.name} (max ${x.P} gp) → ${x.fixed?'tout':x.per+' par monde'}`).join('\n')+`\nProfit ≈ ${gp(p.profit)} · capital ${gp(p.cost)}`;
     navigator.clipboard&&navigator.clipboard.writeText(t).then(()=>{w.querySelector('#vtCopyMsg').textContent='copié ✔'},()=>{w.querySelector('#vtCopyMsg').textContent='copie refusée'})}}
 document.addEventListener('click',e=>{if(tab!=='home')return;const t=e.target.closest('[data-vt],[data-vtk],[data-vtp],[data-vtclassic],[data-vthome]');if(!t)return;e.stopPropagation();const S=vtS();
