@@ -363,7 +363,7 @@ body.compact .atl-mods{grid-template-columns:1fr}
 <body>
 <header id="hd">
   <div class="bar">
-    <div class="logo"><button class="logo-b" data-tab="home" title="Accueil"><span class="logo-mark" aria-hidden="true">HC</span><span class="logo-t">HC Toolkit</span></button><small class="logo-s">Hardcore Worlds · <button class="linkish" id="changelog" title="Nouveautés">v1.5</button></small></div>
+    <div class="logo"><button class="logo-b" data-tab="home" title="Accueil"><span class="logo-mark" aria-hidden="true">HC</span><span class="logo-t">HC Toolkit</span></button><small class="logo-s">Hardcore Worlds · <button class="linkish" id="changelog" title="Nouveautés">v1.7</button></small></div>
     <div class="search"><input id="q" type="search" placeholder="Rechercher un objet…   ( / )" autocomplete="off"><button class="btn kbtn" id="palBtn" title="Aller n'importe où (Ctrl+K)">⌘K</button></div>
     <div class="ctrl">
       <span class="status" id="status">Chargement…</span>
@@ -1231,7 +1231,7 @@ const MOVES={equip:['🎯 Choisis ta cible','🧪 Essaie chaque pièce','🛒 Ac
 const groupOf=t=>(GROUPS.find(g=>g[2].includes(t))||GROUPS[0])[0];
 let lastInGroup=store.get('lastInGroup',{});
 function renderMove(){const m=MOVES[tab];$('#move').innerHTML=m?`<span class="steps big">${m.map(x=>`<span>${esc(x)}</span>`).join('<b>→</b>')}</span>`:''}
-const NEWTABS=new Set(['equip','clues']);
+const NEWTABS=new Set([]);
 function renderTabs(){
   const g=groupOf(tab);lastInGroup[g]=tab;
   const cnt=k=>k==='favs'?favs.size:k==='alerts'?rules.length:null;
@@ -2065,6 +2065,11 @@ function setLive(sec){liveSec=+sec;store.set('liveSec',liveSec);clearInterval(li
 function favRows(){const ids=[...favs].filter(id=>MAP[id]);hcwWant(ids);wantSpark(ids);return ids.map(id=>base(id))}
 
 const CHANGELOG=`<div class="dh"><h2>Nouveautés</h2><button class="btn" id="close">Fermer</button></div>
+ <div class="box"><h3>v1.7 « Arène & Futur » · 20 novembre 2026</h3><ul class="list">
+  <li><span><b>🎯 Entraînement boss</b> (⚔️ Combat & butin, bêta) : <b>TzTok-Jad</b>, <b>les 3 Jads</b> de l'Inferno (écart réglable), <b>Corrupted Hunllef</b> (4 attaques par style, change d'arme après 6 coups) et <b>TzKal-Zuk</b> (reste derrière le bouclier, phase Jad). Horloge réelle (0,6 s), livre de prières à la vraie place, Q / W / E, records et historique. Aucun son.</span></li>
+  <li><span><b>😴 AFK</b> (barre du haut) : 1 clic = ton dernier choix (boss, gros mouvements ou flips) ; ▾ pour changer. Lien direct <code>?afk=1</code>.</span></li>
+  <li><span><b>🔮 Le futur</b> (📈 Bourse) : prévision à 6 h, 24 h ou 7 jours (Prudent / Équilibré / Agressif). Six méthodes rejouées sur les derniers jours sans voir la suite, fourchette, confiance, <b>🕐 meilleure heure pour acheter et revendre</b> (contrôlée jour par jour), moments du passé similaires, et <b>🔭 Scanner</b> (favoris + 30 objets les plus échangés).</span></li>
+</ul></div>
  <div class="box"><h3>v1.5 « Guides » · 19 novembre 2026</h3><ul class="list">
   <li><span><b>📚 Guides</b> (nouveau groupe, juste sous 🧭 Mon plan) : tous tes guides au même endroit, classés par catégorie et par perso, avec une barre de progression. Coche les étapes au fur et à mesure ; si le perso est chargé dans Progression (WikiSync), quêtes et niveaux se cochent tout seuls.</span></li>
   <li><span>Premier guide : <b>Bearinda : bilan des quêtes et route Perilous Moons</b>. Guides « à venir » prêts à demander : Prière 43, Prière 70, Agilité 99, Sailing 200 M, Construction 200 M, 10 milliards en un mois.</span></li>
@@ -3140,6 +3145,397 @@ function confirmSafe(m){try{return window.confirm(m)}catch(e){return true}}
 .gdh4{margin:14px 0 2px}.gdsteps li.done label{text-decoration:line-through;opacity:.6}.gdsteps li.lock label{opacity:.75}
 .gdask{font-family:monospace;font-size:12.5px;padding:8px;border:1px solid var(--line);border-radius:6px;user-select:all}
 .gdnew{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}.gdnew textarea{width:100%}`;document.head.appendChild(st)}
+
+/* ================= v1.7 ARÈNE : simulateurs de boss (bêta) + bouton 😴 AFK =================
+   Horloge du jeu : 1 tick = 0,6 s. Chaque attaque commence (animation visible) au tick t0 et touche au tick t0+W :
+   la bonne prière doit être active à ce moment-là. W = 3 ticks en « réel », 4 en facile, 2 en difficile.
+   Dessins originaux (formes simples), pas les modèles du jeu. Aucun son. */
+const BOSS_LIST=[
+ {id:'jad',name:'TzTok-Jad',place:'Fight Caves · vague 63',ico:'🔥',tip:'Se cabre = magie (Q). Frappe le sol = distance (W). Une attaque toutes les 8 ticks.'},
+ {id:'jad3',name:'Les 3 Jads',place:'Inferno · vague 68',ico:'🔥🔥🔥',tip:'Trois Jads décalés : prie contre chaque attaque dans l\'ordre où elles arrivent. Choisis l\'écart entre les Jads.'},
+ {id:'hunllef',name:'Corrupted Hunllef',place:'Corrupted Gauntlet',ico:'💎',tip:'Change de style toutes les 4 attaques (commence en distance). Toi : change d\'arme après 6 coups réussis, sinon sa protection bloque tout.'},
+ {id:'zuk',name:'TzKal-Zuk',place:'Inferno · vague 69',ico:'👹',tip:'Reste derrière le bouclier qui bouge (← → ou clic). À 480 PV, Jad arrive : prie contre lui sans quitter l\'abri.'}];
+const BOSS_SOON=[['Sol Heredit','Fortis Colosseum, vague 12'],['Zulrah','rotations et couleurs'],['Vorkath','boules de feu, marche « woox »'],['Great Olm','Chambers of Xeric'],['Verzik Vitur','Theatre of Blood'],['Les Wardens','Tombs of Amascut']];
+const PRAYS={mage:{n:'Magie',k:'Q',ico:'✨'},range:{n:'Distance',k:'W',ico:'🏹'},melee:{n:'Mêlée',k:'E',ico:'⚔️'}};
+const WPNS={range:{n:'Arc',k:'1',ico:'🏹'},mage:{n:'Bâton',k:'2',ico:'🪄'},melee:{n:'Hallebarde',k:'3',ico:'🔱'}};
+let bossSt=Object.assign({boss:'jad',diff:'real',len:'50',txt:false,help:true,gap:3,zukJad:false,afk:'boss',rec:{},hist:[]},store.get('bossSt',{}));
+const bsSave=()=>store.set('bossSt',bossSt);
+const TICK=600, ZW=29, SHW=5;
+let SIM=null,simT=null,simNext=0,simRaf=0;const bsKeys={l:false,r:false};
+function rng32(a){a=a>>>0;return()=>{a=a+0x6D2B79F5>>>0;let t=a;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return((t^t>>>14)>>>0)/4294967296}}
+const bsLenN=()=>({'20':20,'50':50})[bossSt.len]||0;
+const bsKey=()=>bossSt.boss+'|'+bossSt.diff+'|'+bossSt.len+(bossSt.boss==='jad3'?'|'+bossSt.gap:'')+(bossSt.boss==='zuk'&&bossSt.zukJad?'|jad':'');
+function bsAtk(S,src,style,now,max){S.atk.push({src,style,t0:S.t,hit:S.t+S.W,at:now,max,rx:null,mg:null,done:false})}
+const BOSS_IMPL={
+ jad:{init(S){S.next=3},
+  tick(S,now){if(S.t>=S.next){const st=S.rng()<.5?'mage':'range';bsAtk(S,0,st,now,st==='mage'?95:97);S.next=S.t+8}},
+  won(S){const n=bsLenN();return n&&S.ok+S.miss>=n}},
+ jad3:{init(S){const g=+bossSt.gap||3;S.nexts=[3,3+g,3+2*g]},
+  tick(S,now){S.nexts.forEach((n,k)=>{if(S.t>=n){const st=S.rng()<.5?'mage':'range';bsAtk(S,k,st,now,97);S.nexts[k]=S.t+8}})},
+  won(S){const n=bsLenN();return n&&S.ok+S.miss>=n}},
+ hunllef:{init(S){S.hl={hp:1000,max:1000,style:'range',cnt:0,prot:['melee','range','mage'][Math.floor(S.rng()*3)],hits:0,wpn:'range',next:5,pNext:4,blocked:0}},
+  tick(S,now){const h=S.hl;
+   if(S.t>=h.next){bsAtk(S,'hl',h.style,now,68);h.cnt++;if(h.cnt>=4){h.cnt=0;h.style=h.style==='range'?'mage':'range'}h.next=S.t+5}
+   if(S.t>=h.pNext){h.pNext=S.t+4;
+    if(h.wpn===h.prot){h.blocked++;S.fx.push({t:S.t,src:'hl',txt:'0 (bloqué)',good:false,boss:true})}
+    else{const d=Math.floor(S.rng()*33);h.hp=Math.max(0,h.hp-d);h.hits++;S.fx.push({t:S.t,src:'hl',txt:String(d),good:true,boss:true});
+     if(h.hits>=6&&h.hp>0){h.prot=h.wpn;h.hits=0;S.fx.push({t:S.t,src:'hl',txt:'🛡 protège '+PRAYS[h.wpn].n,good:false,boss:true})}}}},
+  won(S){return S.hl.hp<=0}},
+ zuk:{init(S){S.z={hp:bossSt.zukJad?480:1200,max:1200,next:10,shX:12,shDir:1,shWait:0,px:14,tx:14,pNext:5,jad:bossSt.zukJad?{next:6}:null,heal:false}},
+  tick(S,now){const z=S.z;
+   if(z.shWait>0)z.shWait--;else{z.shX+=z.shDir;if(z.shX<=0||z.shX>=ZW-SHW){z.shX=Math.max(0,Math.min(ZW-SHW,z.shX));z.shDir*=-1;z.shWait=3}}
+   if(bsKeys.l)z.tx=Math.max(0,z.px-2);if(bsKeys.r)z.tx=Math.min(ZW-1,z.px+2);
+   z.px+=Math.max(-2,Math.min(2,z.tx-z.px));
+   if(S.t>=z.next){bsAtk(S,'zuk','typeless',now,251);z.next=S.t+10}
+   if(z.jad&&S.t>=z.jad.next){const st=S.rng()<.5?'mage':'range';bsAtk(S,'jad',st,now,113);z.jad.next=S.t+8}
+   if(S.t>=z.pNext){const d=Math.floor(S.rng()*71);z.hp=Math.max(0,z.hp-d);z.pNext=S.t+5;
+    if(!z.jad&&z.hp<=480&&z.hp>0){z.jad={next:S.t+4};S.msg='Jad arrive ! Prie contre lui sans quitter l\'abri.'}
+    if(!z.heal&&z.hp<=240&&z.hp>0){z.heal=true;S.msg='240 PV : les soigneurs arrivent (pas encore simulés en bêta).'}}},
+  safe(S){return S.z.px>=S.z.shX&&S.z.px<S.z.shX+SHW},
+  won(S){return S.z.hp<=0}}};
+function simNew(seed){const W=({easy:4,real:3,hard:2})[bossSt.diff]||3;
+  SIM={boss:bossSt.boss,W,t:0,run:false,paused:false,over:false,res:'',hp:99,maxhp:99,pray:null,atk:[],fx:[],ok:0,miss:0,streak:0,bestStreak:0,react:[],marg:[],dmg:0,rng:rng32(seed||Date.now()),tickAt:0,msg:'Prêt. ▶ Lancer (ou Entrée).'};
+  BOSS_IMPL[SIM.boss].init(SIM);return SIM}
+function simSetPray(S,p,now){if(!S||S.over)return;S.pray=S.pray===p?null:p;
+  if(S.pray)S.atk.forEach(a=>{if(!a.done&&a.style===S.pray&&a.rx==null){a.rx=Math.max(0,Math.round(now-a.at));a.mg=a.hit-S.t}})}
+function simTick(S,now){const I=BOSS_IMPL[S.boss];S.t++;S.tickAt=now;I.tick(S,now);
+  S.atk.forEach(a=>{if(a.done||a.hit>S.t)return;a.done=true;
+    const good=a.style==='typeless'?I.safe(S):S.pray===a.style;a.good=good;
+    if(good){S.ok++;S.streak++;S.bestStreak=Math.max(S.bestStreak,S.streak);if(a.rx!=null){S.react.push(a.rx);S.marg.push(a.mg)}S.fx.push({t:S.t,src:a.src,txt:'0',good:true})}
+    else{S.miss++;S.streak=0;const d=bossSt.len==='sd'?S.hp:Math.max(1,Math.floor(S.rng()*(a.max+1)));S.hp=Math.max(0,S.hp-d);S.dmg+=d;S.fx.push({t:S.t,src:a.src,txt:'-'+d,good:false})}});
+  S.atk=S.atk.filter(a=>!a.done||S.t-a.hit<2);S.fx=S.fx.filter(f=>S.t-f.t<3);
+  if(S.hp<=0)simEnd(S,'dead');else if(I.won(S))simEnd(S,'win')}
+const bsAvg=a=>a.length?Math.round(a.reduce((x,y)=>x+y,0)/a.length):null;
+function simEnd(S,res){if(S.over)return;S.over=true;S.res=res;clearTimeout(simT);
+  const secs=Math.round(S.t*.6),k=bsKey(),r=bossSt.rec[k]||{};
+  if(res!=='stop'||S.ok+S.miss>0){
+    r.streak=Math.max(r.streak||0,S.bestStreak);if(res==='win'&&(!r.win||secs<r.win))r.win=secs;r.n=(r.n||0)+1;bossSt.rec[k]=r;
+    bossSt.hist.unshift({d:Date.now(),b:S.boss,diff:bossSt.diff,len:bossSt.len,res,ok:S.ok,miss:S.miss,rx:bsAvg(S.react),s:secs});bossSt.hist=bossSt.hist.slice(0,30);bsSave()}
+  S.msg=res==='win'?`🏆 Gagné en ${secs} s ! ${S.ok} attaques bloquées, ${S.miss} ratée${S.miss>1?'s':''}.`:res==='dead'?`☠ Mort après ${S.ok} attaques bloquées (série max ${S.bestStreak}). Entrée pour recommencer.`:'Arrêté.';
+  simDraw()}
+function simLoop(){if(!SIM||!SIM.run||SIM.paused||SIM.over)return;simTick(SIM,performance.now());simDraw();
+  simNext+=TICK;simT=setTimeout(simLoop,Math.max(0,simNext-performance.now()))}
+function simStart(){simNew();SIM.run=true;SIM.msg='';SIM.tickAt=performance.now();simNext=SIM.tickAt+TICK;clearTimeout(simT);simT=setTimeout(simLoop,TICK);simDraw();bsRaf()}
+function simPause(p){if(!SIM||!SIM.run||SIM.over)return;SIM.paused=p;clearTimeout(simT);
+  if(!p){SIM.tickAt=performance.now();simNext=SIM.tickAt+TICK;simT=setTimeout(simLoop,TICK);bsRaf()}SIM.msg=p?'⏸ Pause (Espace pour reprendre).':'';simDraw()}
+function bsRaf(){cancelAnimationFrame(simRaf);const f=()=>{if(tab!=='boss'||!SIM||!SIM.run||SIM.over||SIM.paused){simDrawCanvas();return}simDrawCanvas();simRaf=requestAnimationFrame(f)};simRaf=requestAnimationFrame(f)}
+/* ---------- dessin ---------- */
+function bsJad(c,x,y,s,anim,p,lab){c.save();c.translate(x,y);c.scale(s,s);
+  const k=anim?Math.sin(Math.min(1,p)*Math.PI):0,breath=Math.sin(performance.now()/400)*1.5;
+  if(anim==='range'){c.translate(0,10*k);c.scale(1+.08*k,1-.08*k)}
+  if(anim==='mage'){c.translate(-6*k,-14*k);c.rotate(-.32*k)}
+  c.fillStyle='rgba(0,0,0,.35)';c.beginPath();c.ellipse(0,46,62,10,0,0,7);c.fill();
+  const g=c.createLinearGradient(0,-40,0,40);g.addColorStop(0,'#c2410c');g.addColorStop(1,'#431407');
+  c.fillStyle='#5a1a0a';[[-38,0],[-18,4],[16,4],[36,0]].forEach(([lx,ly],i)=>{c.save();c.translate(lx,18+ly);if(anim==='mage'&&i>1)c.rotate(-.9*k);c.fillRect(-6,0,12,28);c.restore()});
+  c.fillStyle=g;c.beginPath();c.ellipse(0,breath,52,30,0,0,7);c.fill();
+  c.beginPath();c.moveTo(-50,-4);c.quadraticCurveTo(-82,-10,-90,14);c.lineWidth=7;c.strokeStyle='#7c2d12';c.stroke();
+  c.save();c.translate(46,-18+breath);c.fillStyle='#9a3412';c.beginPath();c.ellipse(0,0,24,17,-.2,0,7);c.fill();
+  c.fillStyle='#fde047';c.beginPath();c.arc(10,-4,3.5,0,7);c.fill();
+  c.strokeStyle='#e7e5e4';c.lineWidth=4;c.beginPath();c.moveTo(-6,-12);c.quadraticCurveTo(-4,-32,-18,-36);c.moveTo(6,-14);c.quadraticCurveTo(12,-34,0,-40);c.stroke();c.restore();
+  c.strokeStyle='#facc15';c.lineWidth=2;c.globalAlpha=.75;c.beginPath();c.moveTo(-30,-6);c.lineTo(-14,4);c.lineTo(0,-8);c.lineTo(14,6);c.lineTo(30,-4);c.stroke();c.globalAlpha=1;
+  if(anim==='mage'&&k>.05){for(let i=0;i<7;i++){const a=i/7*6.28+performance.now()/300;c.fillStyle='rgba(167,139,250,'+(.4+.5*k)+')';c.beginPath();c.arc(46+Math.cos(a)*30*k,-20+Math.sin(a)*24*k,4,0,7);c.fill()}}
+  c.restore();
+  if(anim==='range'&&k>.05){c.save();c.strokeStyle='rgba(251,146,60,'+(.9*k)+')';c.lineWidth=3;for(let i=1;i<=2;i++){c.beginPath();c.ellipse(x,y+46*s,(40+30*i*p)*s,(8+5*i*p)*s,0,0,7);c.stroke()}
+    c.fillStyle='rgba(120,53,15,'+k+')';for(let i=0;i<5;i++){c.beginPath();c.arc(x+(-50+i*25)*s,y+(40-20*k-((i*7)%11))*s,4*s,0,7);c.fill()}c.restore()}
+  if(lab){c.fillStyle='#e9dfc8';c.font='12px "IBM Plex Sans",sans-serif';c.textAlign='center';c.fillText(lab,x,y+70*s)}}
+function bsHunllef(c,x,y,h,anim,p){c.save();c.translate(x,y);const k=anim?Math.sin(Math.min(1,p)*Math.PI):0,b=Math.sin(performance.now()/500)*2;
+  c.fillStyle='rgba(0,0,0,.35)';c.beginPath();c.ellipse(0,52,60,10,0,0,7);c.fill();
+  c.fillStyle='#7f1d1d';c.beginPath();c.moveTo(-44,40);c.lineTo(-30,-10+b);c.lineTo(0,-40+b-8*k);c.lineTo(30,-10+b);c.lineTo(44,40);c.closePath();c.fill();
+  c.fillStyle='#dc2626';[[-30,-10],[-12,-46],[12,-46],[30,-10]].forEach(([sx,sy])=>{c.beginPath();c.moveTo(sx-8,sy+12+b);c.lineTo(sx,sy-14+b-6*k);c.lineTo(sx+8,sy+12+b);c.fill()});
+  c.fillStyle='#fca5a5';c.beginPath();c.arc(-9,-14+b,3,0,7);c.arc(9,-14+b,3,0,7);c.fill();
+  c.translate(0,-74);c.fillStyle='#1c1812';c.strokeStyle='#e9dfc8';c.lineWidth=2;c.beginPath();c.arc(0,0,15,0,7);c.fill();c.stroke();
+  c.font='16px sans-serif';c.textAlign='center';c.textBaseline='middle';c.fillText(PRAYS[h.prot].ico,0,1);c.restore()}
+function bsProj(c,x0,y0,x1,y1,p,style){const x=x0+(x1-x0)*p,y=y0+(y1-y0)*p;c.save();
+  if(style==='mage'){c.fillStyle='#a78bfa';c.shadowColor='#7c3aed';c.shadowBlur=14;c.beginPath();c.arc(x,y,9,0,7);c.fill()}
+  else if(style==='range'){c.translate(x,y);c.rotate(Math.atan2(y1-y0,x1-x0));c.fillStyle='#4ade80';c.shadowColor='#16a34a';c.shadowBlur=10;c.beginPath();c.moveTo(12,0);c.lineTo(-10,-6);c.lineTo(-6,0);c.lineTo(-10,6);c.fill()}
+  else{c.fillStyle='#f97316';c.shadowColor='#ea580c';c.shadowBlur=20;c.beginPath();c.arc(x,y,13,0,7);c.fill()}c.restore()}
+function simDrawCanvas(){const cv=document.getElementById('bsCv');if(!cv||!SIM)return;const c=cv.getContext('2d'),S=SIM,W=cv.width,H=cv.height;
+  const fr=S.run&&!S.paused&&!S.over?Math.min(1,(performance.now()-S.tickAt)/TICK):0,now=S.t+fr;
+  const g=c.createLinearGradient(0,0,0,H);g.addColorStop(0,'#2a1408');g.addColorStop(1,'#120a05');c.fillStyle=g;c.fillRect(0,0,W,H);
+  c.fillStyle='rgba(234,88,12,.12)';for(let i=0;i<8;i++){c.beginPath();c.ellipse((i*97+40)%W,H-18-(i%3)*8,30,5,0,0,7);c.fill()}
+  const pend=src=>S.atk.find(a=>a.src===src&&!a.done),prog=a=>a?Math.max(0,Math.min(1,(now-a.t0)/S.W)):0;
+  const P={x:W/2,y:H-36};
+  if(S.boss==='jad'||S.boss==='jad3'){const n=S.boss==='jad'?1:3;
+    for(let k=0;k<n;k++){const a=pend(k)||S.atk.find(z=>z.src===k&&z.done&&now-z.hit<.6),x=n===1?W/2:W*(k+1)/4,y=n===1?132:105,s=n===1?1.05:.62;
+      bsJad(c,x,y,s,a&&!a.done?a.style:null,prog(a),n>1?'Jad '+(k+1):'');
+      if(a&&!a.done&&prog(a)>.25)bsProj(c,x,y,P.x,P.y,(prog(a)-.25)/.75,a.style)}}
+  if(S.boss==='hunllef'){const a=pend('hl');bsHunllef(c,W/2,120,S.hl,a?a.style:null,prog(a));if(a&&prog(a)>.15)bsProj(c,W/2,110,P.x,P.y,(prog(a)-.15)/.85,a.style);
+    const pa=S.hl.pNext-4,pp=Math.max(0,Math.min(1,(now-pa)/1.2));if(pp<1)bsProj(c,P.x,P.y-10,W/2,140,pp,S.hl.wpn==='mage'?'mage':S.hl.wpn==='range'?'range':'x')}
+  if(S.boss==='zuk'){const z=S.z,tw=(W-40)/ZW,X=t=>20+t*tw;
+    c.save();c.fillStyle='#1a0f0a';c.fillRect(W/2-70,8,140,62);c.fillStyle='#3f1d0b';c.beginPath();c.ellipse(W/2,48,62,30,0,0,7);c.fill();
+    c.fillStyle='#ef4444';c.beginPath();c.arc(W/2-18,42,5,0,7);c.arc(W/2+18,42,5,0,7);c.fill();c.restore();
+    let sx=z.shX;if(fr&&!z.shWait){const nx=z.shX+z.shDir;if(nx>=0&&nx<=ZW-SHW)sx=z.shX+z.shDir*fr}
+    c.fillStyle='rgba(0,0,0,.45)';c.fillRect(X(sx),150,SHW*tw,H-150);c.fillStyle='#a8a29e';c.fillRect(X(sx),136,SHW*tw,14);c.fillStyle='#78716c';c.fillRect(X(sx)+4,139,SHW*tw-8,8);
+    c.strokeStyle='rgba(233,223,200,.15)';for(let t=0;t<=ZW;t++){c.beginPath();c.moveTo(X(t),H-20);c.lineTo(X(t),H-14);c.stroke()}
+    const safe=BOSS_IMPL.zuk.safe(S);c.fillStyle=safe?'#4ade80':'#f87171';c.beginPath();c.arc(X(z.px+.5),H-34,9,0,7);c.fill();
+    c.strokeStyle='#ffff00';c.setLineDash([3,3]);c.beginPath();c.moveTo(X(z.tx+.5),H-12);c.lineTo(X(z.tx+.5),H-4);c.stroke();c.setLineDash([]);
+    const a=pend('zuk');if(a){const p=prog(a);bsProj(c,W/2,60,X(z.px+.5),H-34,p,'x');}
+    if(z.jad){const ja=pend('jad');bsJad(c,W-70,105,.5,ja?ja.style:null,prog(ja),'Jad');if(ja&&prog(ja)>.25)bsProj(c,W-70,105,X(z.px+.5),H-34,(prog(ja)-.25)/.75,ja.style)}
+    c.fillStyle='#e9dfc8';c.font='12px "IBM Plex Sans",sans-serif';c.textAlign='left';c.fillText('Zuk '+z.hp+' / 1200 PV'+(z.heal?' · soigneurs':''),12,H-60)}
+  else if(S.boss!=='zuk'){c.fillStyle='#38bdf8';c.beginPath();c.arc(P.x,P.y,9,0,7);c.fill()}
+  if(S.pray){c.font='18px sans-serif';c.textAlign='center';c.fillText(PRAYS[S.pray].ico,S.boss==='zuk'?20+(S.z.px+.5)*(W-40)/ZW:P.x,(S.boss==='zuk'?H-34:P.y)-18)}
+  S.fx.forEach(f=>{const age=now-f.t;if(age>2)return;c.globalAlpha=Math.max(0,1-age/2);c.font='bold 16px "IBM Plex Sans",sans-serif';c.textAlign='center';
+    c.fillStyle=f.boss?(f.good?'#fde047':'#a8a29e'):(f.good?'#60a5fa':'#ef4444');const fx=f.boss?W/2:(S.boss==='zuk'?20+(S.z.px+.5)*(W-40)/ZW:P.x),fy=(f.boss?165:P.y-30)-age*14;c.fillText(f.txt,fx+(f.src==='jad'?30:0),fy);c.globalAlpha=1});
+  if(bossSt.txt){const as=S.atk.filter(a=>!a.done&&a.style!=='typeless');if(as.length){c.font='bold 18px "Pixelify Sans",sans-serif';c.textAlign='center';c.fillStyle='#ffff00';
+    c.fillText(as.map(a=>PRAYS[a.style].n.toUpperCase()+' → '+PRAYS[a.style].k).join('   '),W/2,24)}}
+  if(S.paused||S.over||!S.run){c.fillStyle='rgba(0,0,0,.55)';c.fillRect(0,0,W,H);c.fillStyle='#ff981f';c.font='bold 20px "Pixelify Sans",sans-serif';c.textAlign='center';
+    c.fillText(S.over?(S.res==='win'?'🏆 Gagné':S.res==='dead'?'☠ Mort':'Arrêté'):S.paused?'⏸ Pause':'▶ Entrée pour lancer',W/2,H/2)}}
+function simDraw(){const S=SIM;if(!S||tab!=='boss')return;simDrawCanvas();
+  const pb=$('#bsPb');if(pb)pb.innerHTML=[...Array(30)].map((_,i)=>{const p=i===16?'mage':i===17?'range':i===18?'melee':null;
+    return p?`<button class="bs-pr${S.pray===p?' on':''}" data-pray="${p}" title="Protect from ${p==='mage'?'Magic':p==='range'?'Missiles':'Melee'} (${PRAYS[p].k})"><span>${PRAYS[p].ico}</span><small>${PRAYS[p].k}</small></button>`:'<span class="bs-pr off"></span>'}).join('');
+  const st=$('#bsStat');if(!st)return;
+  const nxt=S.atk.filter(a=>!a.done).sort((a,b)=>a.hit-b.hit)[0],left=nxt?Math.max(0,nxt.hit-S.t):null;
+  const cyc=S.boss==='jad'?((S.t-(S.next-8))%8+8)%8:null;
+  let extra='';
+  if(S.boss==='hunllef'){const h=S.hl;extra=`<div class="bs-row">Hunllef <b>${h.hp}</b> / ${h.max} PV · protège <b>${PRAYS[h.prot].ico} ${PRAYS[h.prot].n}</b></div>
+    ${bossSt.help?`<div class="bs-row small">Ses attaques : <b>${h.cnt}/4</b> en ${PRAYS[h.style].n.toLowerCase()} · tes coups : <b>${h.hits}/6</b> avant qu'il change${h.blocked?` · ${h.blocked} coup${h.blocked>1?'s':''} bloqué${h.blocked>1?'s':''}`:''}</div>`:''}
+    <div class="bs-wp">${Object.entries(WPNS).map(([k,w])=>`<button class="btn${h.wpn===k?' primary':''}" data-wpn="${k}">${w.ico} ${w.n} <small>(${w.k})</small></button>`).join('')}</div>`}
+  if(S.boss==='zuk')extra=`<div class="bs-row">Tu es <b class="${BOSS_IMPL.zuk.safe(S)?'up':'down'}">${BOSS_IMPL.zuk.safe(S)?'à l\'abri':'À DÉCOUVERT'}</b> · Zuk tire toutes les 10 ticks${S.z.jad?' · Jad toutes les 8':''}</div>`;
+  const n=S.boss==='jad'||S.boss==='jad3'?bsLenN():0;
+  st.innerHTML=`<div class="bs-hp"><i style="width:${S.hp/S.maxhp*100}%"></i><span>${S.hp} / ${S.maxhp} PV</span></div>
+   <div class="bs-bar" title="Temps avant que la prochaine attaque touche"><i style="width:${left==null?0:left/S.W*100}%"></i></div>
+   ${cyc!=null?`<div class="bs-ticks">${[...Array(8)].map((_,i)=>`<span class="${i===cyc?'on':''}"></span>`).join('')}</div>`:''}
+   <div class="bs-row">Bloquées <b class="up">${S.ok}</b> · ratées <b class="down">${S.miss}</b>${n?` · ${S.ok+S.miss}/${n}`:''} · série <b>${S.streak}</b> (max ${S.bestStreak})</div>
+   <div class="bs-row small">Réaction moyenne <b>${bsAvg(S.react)??'–'} ms</b> · marge moyenne <b>${S.marg.length?fmt1(S.marg.reduce((a,b)=>a+b,0)/S.marg.length):'–'} tick</b> · tick ${S.t}</div>
+   ${extra}<p class="bs-msg">${esc(S.msg||'')}</p>`;
+  const pz=$('#bsPause');if(pz)pz.textContent=S.paused?'▶ Reprendre':'⏸ Pause'}
+function renderBoss(){const host=hostBox();
+  $('#intro').textContent='Entraîne tes réflexes de prière pendant que tes persos sont AFK. Horloge réelle du jeu (0,6 s par tick), dessins originaux, aucun son. Raccourcis : Q / W / E = protections, Espace = pause, Entrée = lancer. La partie se met en pause si tu quittes l\'onglet ou la fenêtre. Bêta : les mécaniques sont simplifiées, dis-moi ce qui sonne faux.';
+  if(!SIM||SIM.boss!==bossSt.boss)simNew();
+  const B=BOSS_LIST.find(b=>b.id===bossSt.boss)||BOSS_LIST[0];
+  const rec=bossSt.rec[bsKey()]||{};
+  const opt=(k,l,arr)=>`<label>${l} <select data-bso="${k}">${arr.map(([v,t])=>`<option value="${v}" ${String(bossSt[k])===String(v)?'selected':''}>${t}</option>`).join('')}</select></label>`;
+  const lens=B.id==='hunllef'||B.id==='zuk'?[['50','Combat complet'],['sd','Mort subite']]:[['20','20 attaques'],['50','50 attaques'],['sd','Mort subite'],['inf','Sans fin']];
+  if(!lens.some(x=>x[0]===bossSt.len))bossSt.len=lens[0][0];
+  host.innerHTML=`<section class="box"><div class="bs-cards">${BOSS_LIST.map(b=>`<button class="bs-card${b.id===B.id?' on':''}" data-bsboss="${b.id}"><span class="bs-ico">${b.ico}</span><b>${esc(b.name)}</b><span class="small mut">${esc(b.place)}</span>${b.id!=='jad'?'<span class="pill gold">bêta</span>':''}</button>`).join('')}</div>
+   <p class="small">${esc(B.tip)}</p>
+   <div class="bs-opts">${opt('diff','Difficulté',[['easy','Facile (4 ticks)'],['real','Réel (3 ticks)'],['hard','Difficile (2 ticks)']])}${opt('len','Durée',lens)}
+    ${B.id==='jad3'?opt('gap','Écart entre Jads',[[3,'3 ticks (conseillé)'],[2,'2 ticks'],[1,'1 tick (expert)']]):''}
+    ${B.id==='zuk'?`<label><input type="checkbox" data-bso="zukJad" ${bossSt.zukJad?'checked':''}> Commencer à la phase Jad</label>`:''}
+    ${B.id==='hunllef'?`<label><input type="checkbox" data-bso="help" ${bossSt.help?'checked':''}> Afficher les compteurs</label>`:''}
+    <label><input type="checkbox" data-bso="txt" ${bossSt.txt?'checked':''}> Écrire l'attaque en clair</label></div>
+   <div class="bs-main"><div class="bs-arena"><canvas id="bsCv" width="560" height="300"></canvas></div>
+    <div class="bs-side"><div class="bs-pb" id="bsPb"></div><div id="bsStat"></div>
+     <div class="bs-ctl"><button class="btn primary" data-bs="start">▶ Lancer</button> <button class="btn" data-bs="pause" id="bsPause">⏸ Pause</button> <button class="btn" data-bs="stop">■ Arrêter</button></div></div></div></section>
+   <section class="box"><h3>Records et historique</h3>
+    <p class="small">Ce réglage (${esc(B.name)}, ${esc(({easy:'facile',real:'réel',hard:'difficile'})[bossSt.diff])}) : meilleure série <b>${rec.streak||0}</b>${rec.win?` · victoire la plus rapide <b>${rec.win} s</b>`:''} · ${rec.n||0} partie${(rec.n||0)>1?'s':''}.</p>
+    ${bossSt.hist.length?`<ul class="list">${bossSt.hist.slice(0,8).map(h=>`<li><span>${new Date(h.d).toLocaleString('fr-BE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})} · ${esc((BOSS_LIST.find(b=>b.id===h.b)||{}).name||h.b)} · ${h.res==='win'?'🏆':h.res==='dead'?'☠':'■'}</span><span>${h.ok} ✔ / ${h.miss} ✘ · ${h.rx??'–'} ms · ${h.s} s</span></li>`).join('')}</ul>`:'<p class="mut small">Aucune partie pour l\'instant.</p>'}
+    <h3>Bientôt</h3><p class="small">${BOSS_SOON.map(([n,p])=>`<span class="pill">${esc(n)} · ${esc(p)}</span>`).join(' ')}</p>
+    <p class="small mut">Idées : soigneurs de Jad, option son (je te demanderai avant), animations réelles du wiki en option.</p></section>`;
+  simDraw()}
+VIEWS.boss={label:'Entraînement boss 🎯',custom:true,render:()=>renderBoss()};
+MOVES.boss=['🎯 Choisis un boss','▶ Lance (Entrée)','🙏 Prie juste à temps (Q / W / E)'];
+NEWTABS.add('boss');
+{const g=GROUPS.find(x=>x[0]==='combat');if(g&&!g[2].includes('boss'))g[2].push('boss')}
+document.addEventListener('click',e=>{if(tab!=='boss')return;const t=e.target.closest('[data-bs],[data-bsboss],[data-pray],[data-wpn],#bsCv');if(!t)return;
+  if(t.id==='bsCv'){if(SIM&&SIM.boss==='zuk'&&SIM.run&&!SIM.over){const b=t.getBoundingClientRect(),x=(e.clientX-b.left)/b.width*t.width;SIM.z.tx=Math.max(0,Math.min(ZW-1,Math.floor((x-20)/((t.width-40)/ZW))))}else if(!SIM||!SIM.run||SIM.over)simStart();return}
+  if(t.dataset.bsboss){clearTimeout(simT);bossSt.boss=t.dataset.bsboss;bsSave();SIM=null;render();return}
+  if(t.dataset.pray){simSetPray(SIM,t.dataset.pray,performance.now());simDraw();return}
+  if(t.dataset.wpn){if(SIM&&SIM.hl){SIM.hl.wpn=t.dataset.wpn;simDraw()}return}
+  const a=t.dataset.bs;if(a==='start')simStart();else if(a==='pause')simPause(!SIM.paused);else if(a==='stop'&&SIM&&SIM.run&&!SIM.over)simEnd(SIM,'stop')});
+document.addEventListener('change',e=>{if(tab!=='boss')return;const t=e.target;if(!t.dataset.bso)return;
+  bossSt[t.dataset.bso]=t.type==='checkbox'?t.checked:t.value;bsSave();clearTimeout(simT);SIM=null;render()});
+document.addEventListener('keydown',e=>{if(tab!=='boss'||e.ctrlKey||e.metaKey||e.altKey)return;if(/^(INPUT|SELECT|TEXTAREA)$/.test((e.target&&e.target.tagName)||''))return;
+  const k=e.key.toLowerCase(),now=performance.now();
+  if(k==='q'||k==='w'||k==='e'){simSetPray(SIM,k==='q'?'mage':k==='w'?'range':'melee',now);simDraw();e.preventDefault()}
+  else if((k==='1'||k==='2'||k==='3')&&SIM&&SIM.hl){SIM.hl.wpn=k==='1'?'range':k==='2'?'mage':'melee';simDraw();e.preventDefault()}
+  else if(k===' '){if(SIM&&SIM.run&&!SIM.over)simPause(!SIM.paused);e.preventDefault()}
+  else if(k==='enter'){if(!SIM||!SIM.run||SIM.over)simStart();e.preventDefault()}
+  else if(k==='arrowleft'||k==='a'){bsKeys.l=true;e.preventDefault()}else if(k==='arrowright'||k==='d'){bsKeys.r=true;e.preventDefault()}});
+document.addEventListener('keyup',e=>{const k=e.key.toLowerCase();if(k==='arrowleft'||k==='a')bsKeys.l=false;if(k==='arrowright'||k==='d')bsKeys.r=false});
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&SIM&&SIM.run&&!SIM.over&&!SIM.paused)simPause(true)});
+window.addEventListener('blur',()=>{bsKeys.l=bsKeys.r=false;if(SIM&&SIM.run&&!SIM.over&&!SIM.paused)simPause(true)});
+/* ---------- 😴 AFK : 1 clic = dernier choix ---------- */
+const AFK_OPTS={boss:'🎯 Entraînement boss',hits:'📈 Gros mouvements',flips:'💰 Flips'};
+function afkGo(kind){if(!AFK_OPTS[kind])kind='boss';bossSt.afk=kind;bsSave();const m=$('#afkMenu');if(m)m.open=false;
+  if(kind==='boss'){tab='boss';store.set('tab',tab);render();simStart()}
+  else{tab=kind;store.set('tab',tab);render();refresh()}
+  const b=$('#afkBtn');if(b)b.title='1 clic : '+AFK_OPTS[bossSt.afk]}
+{const cb=$('#compactBtn');if(cb&&!$('#afkBtn')){const w=document.createElement('span');w.className='afkw';
+  w.innerHTML=`<button class="btn" id="afkBtn" title="1 clic : ${AFK_OPTS[bossSt.afk]||AFK_OPTS.boss}">😴<span class="hide-c"> AFK</span></button><details class="afkm" id="afkMenu"><summary class="btn" title="Choisir quoi faire quand tu es AFK">▾</summary><div class="menu-p afkp"><b class="menu-t">Quand je suis AFK…</b>${Object.entries(AFK_OPTS).map(([k,l])=>`<button class="btn" data-afk="${k}">${l}</button>`).join('')}<span class="small mut">Le bouton 😴 relance ton dernier choix.</span></div></details>`;
+  cb.before(w)}}
+document.addEventListener('click',e=>{if(e.target.closest('#afkBtn')){afkGo(bossSt.afk||'boss');return}const a=e.target.closest('[data-afk]');if(a)afkGo(a.dataset.afk)});
+{const st=document.createElement('style');st.textContent=`.afkw{display:inline-flex;gap:2px;align-items:center}@media (max-width:1400px){#afkBtn .hide-c{display:none}}.afkm{position:relative}.afkm>summary{list-style:none;cursor:pointer;padding:7px 6px}.afkm>summary::-webkit-details-marker{display:none}.afkp{min-width:220px}
+.bs-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-bottom:8px}
+.bs-card{display:flex;flex-direction:column;gap:2px;align-items:flex-start;text-align:left;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--chip);color:var(--fg);cursor:pointer}.bs-card.on{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold)}.bs-ico{font-size:18px}
+.bs-opts{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;margin:8px 0}
+.bs-main{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(220px,1fr);gap:12px;align-items:start}
+@media (max-width:820px){.bs-main{grid-template-columns:1fr}}body.compact .bs-main{grid-template-columns:1fr}
+.bs-arena canvas{width:100%;height:auto;display:block;border:3px solid var(--line);border-radius:4px;background:#120a05;cursor:pointer;image-rendering:auto}
+.bs-pb{display:grid;grid-template-columns:repeat(5,1fr);gap:3px;max-width:230px;padding:6px;background:#3a2e22;border:2px solid var(--line);border-radius:4px}
+.bs-pr{aspect-ratio:1;border:1px solid transparent;border-radius:4px;background:transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0;cursor:pointer;font-size:17px;line-height:1}
+.bs-pr small{font-size:9px;color:var(--muted)}.bs-pr.off{background:radial-gradient(circle,#4a3f31 30%,transparent 32%);cursor:default}
+.bs-pr:not(.off){background:#2a2219;border-color:var(--hi)}.bs-pr.on{background:radial-gradient(circle,#fff6a8 0,#d9a400 55%,#5a3a12 100%);border-color:var(--yel)}
+.bs-hp{position:relative;height:18px;background:#7a1a12;border:1px solid var(--line);margin-top:8px}.bs-hp i{position:absolute;inset:0 auto 0 0;background:#2e9e3a}.bs-hp span{position:relative;display:block;text-align:center;font-size:12px;line-height:18px;text-shadow:1px 1px 0 #000}
+.bs-bar{height:8px;background:var(--line);margin-top:6px}.bs-bar i{display:block;height:100%;background:var(--yel);transition:width .15s linear}
+.bs-ticks{display:flex;gap:5px;margin-top:6px}.bs-ticks span{width:12px;height:12px;border-radius:50%;background:var(--line);border:1px solid var(--hi)}.bs-ticks span.on{background:var(--gold)}
+.bs-row{margin-top:6px;font-size:13px}.bs-row.small{font-size:12px;max-width:none}.bs-wp{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}.bs-msg{min-height:18px;margin:6px 0 0;color:var(--gold)}.bs-ctl{margin-top:8px;display:flex;gap:6px;flex-wrap:wrap}`;document.head.appendChild(st)}
+/* lien direct : ?afk=1 (boss, lancé tout de suite, même sans prix) · ?afk=market / hits / flips */
+try{const a=new URLSearchParams(location.search).get('afk');if(a){const k=a==='1'||a==='boss'?'boss':a==='flips'?'flips':'hits';bossSt.afk=k;bsSave();
+  if(k==='boss')setTimeout(()=>afkGo('boss'),0);else{tab=k;store.set('tab',tab)}}}catch(e){}
+
+/* ================= v1.7 🔮 LE FUTUR : prévoir la suite d'un objet en comparant les historiques =================
+   Travail en log-prix (milieu achat/vente). Méthodes : statu quo, tendance amortie, retour à la moyenne, analogues (même monde),
+   analogues jeu normal (mis à l'échelle de la volatilité), écart HC / normal (plafonné : ne traverse jamais le prix normal).
+   Backtest à 6 h et 24 h : chaque méthode rejouée ~60 fois sans voir la suite → poids = 1 / erreur². 7 jours : poids fixes.
+   Meilleure heure : profil horaire (heure belge) contrôlé jour par jour hors échantillon. */
+let futSt=Object.assign({id:null,hz:'24h',mode:'bal',recent:[]},store.get('futSt',{}));
+const futSave=()=>store.set('futSt',futSt);
+const FUTC={},FUTR={};let futScan=null,futBusy=null;
+const FUT_MODES={safe:{n:'😴 Prudent',shrink:.5,q:[.1,.9],z:1.28,days:5,hit:.8},bal:{n:'⚖️ Équilibré',shrink:.25,q:[.2,.8],z:.84,days:4,hit:.8},agg:{n:'🔥 Agressif',shrink:0,q:[.25,.75],z:.67,days:3,hit:.6}};
+const FUT_HZ={'6h':{n:'⚡ 6 h',h:6},'24h':{n:'24 h',h:24},'7d':{n:'💰 7 jours',h:168}};
+const FUT_MN={sq:'Statu quo (le prix ne bouge pas)',trend:'Tendance amortie',mean:'Retour à la moyenne (3 jours)',ana:'Analogues (même monde)',anaN:'Analogues jeu normal',gap:'Écart HC / jeu normal'};
+async function futTs(base,id,look){const k=base+'|'+id+'|'+look,c=FUTC[k];if(c&&Date.now()-c.t<15*60e3)return c.d;
+  let d=[];try{d=(await j(base+`timeseries?id=${id}&lookback=${look}`)).data||[]}catch(e){d=[]}FUTC[k]={t:Date.now(),d};return d}
+function futGrid(data,step){if(!data)return null;
+  const pts=data.map(d=>{const h=d.avgHighPrice,l=d.avgLowPrice;return{t:d.timestamp,m:h&&l?(h+l)/2:(h||l||0),h,l,v:(d.highPriceVolume||0)+(d.lowPriceVolume||0)}}).filter(p=>p.m>0).sort((a,b)=>a.t-b.t);
+  if(pts.length<2)return null;const t0=pts[0].t,t1=pts[pts.length-1].t,n=Math.round((t1-t0)/step)+1;
+  const G={ts:[],lp:[],raw:[],sp:[],vol:[],step,sh:step/3600};let k=0,last=Math.log(pts[0].m);
+  for(let i=0;i<n;i++){const t=t0+i*step;while(k<pts.length&&pts[k].t<t-step/2)k++;const p=pts[k]&&Math.abs(pts[k].t-t)<=step/2?pts[k]:null;
+    if(p)last=Math.log(p.m);G.ts.push(t);G.lp.push(last);G.raw.push(!!p);G.sp.push(p&&p.h&&p.l?Math.abs(Math.log(p.h/p.l)):NaN);G.vol.push(p?p.v:0)}
+  const df=[];for(let i=1;i<n;i++)if(G.raw[i]&&G.raw[i-1])df.push(G.lp[i]-G.lp[i-1]);
+  G.sig=Math.sqrt(df.reduce((a,b)=>a+b*b,0)/Math.max(1,df.length))||0.01; /* mouvement typique par pas (tendance comprise) */
+  return G}
+function futAt(G,t){if(!G)return null;let lo=0,hi=G.ts.length-1;if(t<G.ts[0]-G.step)return null;while(lo<hi){const m=(lo+hi+1)>>1;if(G.ts[m]<=t)lo=m;else hi=m-1}return G.lp[lo]}
+function linSlope(y,a,b){let n=0,sx=0,sy=0,sxx=0,sxy=0;for(let i=a;i<=b;i++){const x=i-a;n++;sx+=x;sy+=y[i];sxx+=x*x;sxy+=x*y[i]}const d=n*sxx-sx*sx;return d?(n*sxy-sx*sy)/d:0}
+const futMed=a=>{const b=a.filter(x=>isFinite(x)).sort((x,y)=>x-y);return b.length?b[Math.floor(b.length/2)]:NaN};
+const futQ=(a,q)=>{const b=a.slice().sort((x,y)=>x-y);if(!b.length)return 0;const p=(b.length-1)*q,l=Math.floor(p);return b[l]+(b[Math.min(b.length-1,l+1)]-b[l])*(p-l)};
+/* analogues : motif q (log relatif au dernier point, normalisé par la volatilité) cherché dans R ; renvoie le mouvement moyen qui a suivi */
+function futAna(q,sigQ,R,hs,tMax,sigOut,k=5){if(!R)return null;const m=q.length,out=[];
+  for(let j=m-1;j+hs<R.lp.length;j++){if(R.ts[j+hs]>tMax)break;let d=0;for(let u=0;u<m;u++){const r=(R.lp[j-m+1+u]-R.lp[j])/R.sig,z=q[u]/sigQ;d+=(r-z)*(r-z)}out.push({j,d})}
+  if(out.length<k)return null;out.sort((a,b)=>a.d-b.d);const pick=[];for(const o of out){if(pick.every(p=>Math.abs(p.j-o.j)>=m))pick.push(o);if(pick.length>=k)break}
+  const mv=pick.map(p=>(R.lp[p.j+hs]-R.lp[p.j])/R.sig);return{move:mv.reduce((a,b)=>a+b,0)/mv.length*sigOut,matches:pick.map((p,i)=>({t:R.ts[p.j],after:mv[i]*R.sig,d:p.d}))}}
+function futPattern(G,i,m){const q=[];for(let u=m-1;u>=0;u--)q.push(G.lp[i-u]-G.lp[i]);return q}
+/* prévision de chaque méthode au point i (données jusqu'à i incluses), horizon h pas de G */
+function futMethods(G,C,i,h){const sh=G.sh,o={},lp=G.lp;
+  o.sq=lp[i];
+  {const L=Math.min(Math.round(24/sh),i);if(L>=4){const s=linSlope(lp,i-L,i),phi=Math.pow(.9,sh);let f=0,p=1;for(let k=1;k<=h;k++){p*=phi;f+=p}o.trend=lp[i]+s*f}}
+  {const L=Math.min(Math.round(72/sh),i+1);let m=0;for(let k=i-L+1;k<=i;k++)m+=lp[k];m/=L;o.mean=m+(lp[i]-m)*Math.exp(-h*sh/24)}
+  const m=Math.max(3,Math.round(12/sh));
+  if(i>=m){const q=futPattern(G,i,m);const a=futAna(q,G.sig,G,h,G.ts[i],G.sig);if(a)o.ana=lp[i]+a.move;
+    if(C.N&&C.N.step===G.step){const b=futAna(q,G.sig,C.N,h,G.ts[i],G.sig);if(b)o.anaN=lp[i]+b.move}}
+  if(C.N){const n0=futAt(C.N,G.ts[i]);if(n0!=null){const L=Math.min(Math.round(48/sh),i),qs=[];for(let k=i-L;k<=i;k++){const n=futAt(C.N,G.ts[k]);qs.push(n==null?NaN:lp[k]-n)}
+    if(qs.every(isFinite)&&qs.length>4){const s=linSlope(qs,0,qs.length-1);let p=lp[i]+s*h*.5;const gap=lp[i]-n0;if(gap<0)p=Math.min(p,n0);else p=Math.max(p,n0);o.gap=p}}}
+  return o}
+function futForecast(G,C,hz,mode){const M=FUT_MODES[mode]||FUT_MODES.bal,n=G.lp.length,i=n-1,h=Math.round(FUT_HZ[hz].h/G.sh),R={hz,mode,h,now:G.lp[i],t:G.ts[i],sig:G.sig};
+  const spr=futMed(G.sp.slice(-Math.round(72/G.sh)));R.spread=isFinite(spr)?spr:0.01;
+  const tr=G.vol.slice(-Math.round(24/G.sh)).reduce((a,b)=>a+b,0);R.trades=C.trades!=null?C.trades:tr;
+  const cur=futMethods(G,C,i,h);const lim=Math.max(3*G.sig*Math.sqrt(h),1.5*Math.abs(G.lp[i]-G.lp[Math.max(0,i-h)])); /* bon sens : pas plus que 3 écarts types ni 1,5× le dernier mouvement de même durée */
+  R.rows=Object.keys(FUT_MN).map(k=>({k,pred:cur[k],ok:cur[k]!=null&&Math.abs(cur[k]-G.lp[i])<=lim+1e-9}));
+  if(hz==='7d'||n-1-h<Math.round(48/G.sh)+20){
+    const base={sq:.4,mean:.2,trend:.1,anaN:.2,gap:.1,ana:0};R.back=false;R.rows.forEach(r=>{r.w=r.pred!=null?(base[r.k]||0)*(r.ok?1:.25):0});
+    const sw=R.rows.reduce((a,r)=>a+r.w,0)||1;R.rows.forEach(r=>r.w/=sw);
+    let c=R.rows.reduce((a,r)=>a+(r.pred!=null?r.w*r.pred:0),0);c=G.lp[i]+(c-G.lp[i])*(1-M.shrink);R.pred=c;
+    const sd=G.sig*Math.sqrt(h);R.lo=c-M.z*sd;R.hi=c+M.z*sd;R.conf=0;R.gain=null}
+  else{R.back=true;const iEnd=n-1-h,iStart=Math.max(Math.round(48/G.sh),iEnd-Math.round(160/G.sh)),K=Math.min(60,iEnd-iStart+1),bt=[];
+    for(let q=0;q<K;q++){const o=K>1?Math.round(iStart+q*(iEnd-iStart)/(K-1)):iEnd;const p=futMethods(G,C,o,h);bt.push({p,a:G.lp[o+h]})}
+    R.nb=bt.length;
+    R.rows.forEach(r=>{const e=bt.filter(b=>b.p[r.k]!=null).map(b=>b.p[r.k]-b.a);r.n=e.length;r.rmse=e.length?Math.sqrt(e.reduce((a,b)=>a+b*b,0)/e.length):null;
+      r.w=r.pred!=null&&r.rmse!=null&&r.n>=Math.min(20,bt.length*.6)?1/(r.rmse*r.rmse+1e-6)*(r.ok?1:.25):0});
+    const sw=R.rows.reduce((a,r)=>a+r.w,0)||1;R.rows.forEach(r=>r.w/=sw);
+    const comb=p=>{let s=0,w=0;R.rows.forEach(r=>{if(r.w&&p[r.k]!=null){s+=r.w*p[r.k];w+=r.w}});return w?s/w:p.sq};
+    const ec=bt.map(b=>{const c=comb(b.p);return b.p.sq+(c-b.p.sq)*(1-M.shrink)-b.a});
+    const rc=Math.sqrt(ec.reduce((a,b)=>a+b*b,0)/(ec.length||1)),rs=(R.rows.find(r=>r.k==='sq')||{}).rmse||rc;
+    R.rmse=rc;R.rmseSq=rs;R.gain=rs>0?1-rc/rs:0;
+    let c=comb(cur);c=G.lp[i]+(c-G.lp[i])*(1-M.shrink);R.pred=c;R.lo=c+futQ(ec,M.q[0]);R.hi=c+futQ(ec,M.q[1]);if(R.lo>R.pred)R.lo=R.pred;if(R.hi<R.pred)R.hi=R.pred;
+    R.conf=R.gain>=.10?2:R.gain>=.02?1:0}
+  R.thin=R.trades<60;if(R.thin)R.conf=Math.max(0,R.conf-1);
+  R.move=Math.exp(R.pred-R.now)-1;R.strong=R.conf>=1&&Math.abs(R.pred-R.now)>R.spread;
+  const m=Math.max(3,Math.round(12/G.sh));if(n>m+h){const a=futAna(futPattern(G,i,m),G.sig,G,h,G.ts[i],G.sig,3);R.matches=a?a.matches:[]}
+  return R}
+/* 🕐 meilleure heure de la journée (heure belge), contrôlée jour par jour hors échantillon */
+const FUT_FH=new Intl.DateTimeFormat('fr-BE',{hour:'numeric',hourCycle:'h23',timeZone:'Europe/Brussels'}),FUT_FD=new Intl.DateTimeFormat('fr-BE',{timeZone:'Europe/Brussels',year:'numeric',month:'2-digit',day:'2-digit'});
+function futHours(G,mode){const M=FUT_MODES[mode]||FUT_MODES.bal;if(!G||G.sh!==1)return null;
+  const byDay={},n=G.lp.length;G.ts.forEach((t,i)=>{if(!G.raw[i]||i<12||i+12>n)return;let ma=0;for(let k=i-12;k<i+12;k++)ma+=G.lp[k];ma/=24; /* écart à la moyenne mobile 24 h : la tendance ne fausse pas l'heure */
+    const d=FUT_FD.format(new Date(t*1000)),h=parseInt(FUT_FH.format(new Date(t*1000)))%24;(byDay[d]=byDay[d]||{})[h]=G.lp[i]-ma});
+  const days=Object.entries(byDay).filter(([,o])=>Object.keys(o).length>=18).map(([d,o])=>{const v=Object.values(o),m=v.reduce((a,b)=>a+b,0)/v.length,dev={};for(const h in o)dev[h]=o[h]-m;return{d,dev}});
+  const R={days:days.length,ok:false};if(days.length<3)return R;
+  const prof=ex=>{const p=[];for(let h=0;h<24;h++){const v=days.filter(x=>x!==ex&&x.dev[h]!=null).map(x=>x.dev[h]);p.push(v.length>=2?v.reduce((a,b)=>a+b,0)/v.length:null)}return p};
+  const arg=(p,f)=>{let b=-1;p.forEach((v,h)=>{if(v!=null&&(b<0||f(v,p[b])))b=h});return b};
+  const gains=[];days.forEach(x=>{const p=prof(x),b=arg(p,(a,c)=>a<c),s=arg(p,(a,c)=>a>c);if(b<0||s<0||x.dev[b]==null||x.dev[s]==null)return;gains.push(x.dev[s]-x.dev[b])});
+  const p=prof(null);R.profile=p;R.buy=arg(p,(a,c)=>a<c);R.sell=arg(p,(a,c)=>a>c);R.tested=gains.length;
+  if(!gains.length)return R;R.gain=gains.reduce((a,b)=>a+b,0)/gains.length;R.hit=gains.filter(g=>g>0).length/gains.length;
+  R.inSample=R.buy>=0?p[R.sell]-p[R.buy]:0;const spr=futMed(G.sp);R.spread=isFinite(spr)?spr:0.01;
+  R.ok=R.gain>R.spread&&R.hit>=M.hit&&gains.length>=M.days;return R}
+async function futLoad(id,hz=futSt.hz,mode=futSt.mode){const key=id+'|'+hz+'|'+mode;if(FUTR[key]&&Date.now()-FUTR[key].at<15*60e3)return FUTR[key];
+  const hc=WORLD!=='osrs';const look=hz==='7d'?'30d':'7d',step=hz==='7d'?21600:3600;
+  const [a,b,h7]=await Promise.all([futTs(API,id,look),hc?futTs(OSRS,id,look):Promise.resolve(null),hz==='7d'?futTs(API,id,'7d'):Promise.resolve(null)]);
+  const G=futGrid(a,step),N=futGrid(b,step),H=hz==='7d'?futGrid(h7,3600):G;
+  const d=D24[id],trades=d?(d.highPriceVolume||0)+(d.lowPriceVolume||0):null;
+  let res;if(!G||G.lp.length<(hz==='7d'?16:36))res={err:'Pas assez d\'historique pour cet objet sur ce monde.',G};
+  else{res=futForecast(G,{N,trades},hz,mode);res.G=G;res.N=N;res.hours=futHours(H,mode)}
+  res.at=Date.now();FUTR[key]=res;return res}
+const futPct=x=>(x>=0?'+':'')+fmt1(x*100)+' %';
+const FUT_CONF=['🔴 faible','🟠 moyenne','🟢 bonne'];
+function futChart(R){const G=R.G,N=R.N,back=Math.min(G.lp.length,Math.round((R.hz==='7d'?336:72)/G.sh)),i0=G.lp.length-back;
+  const W=640,H=230,P={l:56,r:14,t:10,b:24},t0=G.ts[i0],t1=R.t+R.h*G.step;
+  const ys=G.lp.slice(i0).concat([R.lo,R.hi]);let nl=[];if(N){for(let i=i0;i<G.lp.length;i++){const v=futAt(N,G.ts[i]);if(v!=null)nl.push([G.ts[i],v])}}
+  let lo=Math.min(...ys),hi=Math.max(...ys);const span=hi-lo||.02;const nOk=nl.length&&nl.every(([,v])=>v>lo-span*1.5&&v<hi+span*1.5);if(nOk)nl.forEach(([,v])=>{lo=Math.min(lo,v);hi=Math.max(hi,v)});
+  const pad=(hi-lo||.02)*.1;lo-=pad;hi+=pad;const X=t=>P.l+(t-t0)/(t1-t0)*(W-P.l-P.r),Y=v=>P.t+(hi-v)/(hi-lo)*(H-P.t-P.b);
+  const path=pts=>pts.map((p,k)=>(k?'L':'M')+X(p[0]).toFixed(1)+','+Y(p[1]).toFixed(1)).join('');
+  const past=path(G.ts.slice(i0).map((t,k)=>[t,G.lp[i0+k]]));
+  const grid=[0,.25,.5,.75,1].map(f=>{const v=lo+(hi-lo)*f;return `<line x1="${P.l}" x2="${W-P.r}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)"/><text x="${P.l-5}" y="${Y(v)+4}" text-anchor="end" font-size="11" fill="var(--muted)">${gp(Math.exp(v))}</text>`}).join('');
+  const fmtT=t=>{const d=new Date(t*1000);return R.hz==='7d'?d.toLocaleDateString('fr-BE',{day:'2-digit',month:'2-digit'}):d.toLocaleString('fr-BE',{weekday:'short',hour:'2-digit',minute:'2-digit'})};
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Historique et prévision">${grid}
+   ${nOk?`<path d="${path(nl)}" fill="none" stroke="var(--muted)" stroke-width="1.2" stroke-dasharray="4 3" opacity=".8"/>`:''}
+   <polygon points="${X(R.t)},${Y(R.now)} ${X(t1)},${Y(R.hi)} ${X(t1)},${Y(R.lo)}" fill="var(--gold)" opacity=".22"/>
+   <path d="${past}" fill="none" stroke="var(--fg)" stroke-width="1.6"/><line x1="${X(R.t)}" y1="${Y(R.now)}" x2="${X(t1)}" y2="${Y(R.pred)}" stroke="var(--gold)" stroke-width="2" stroke-dasharray="5 3"/>
+   <line x1="${X(R.t)}" x2="${X(R.t)}" y1="${P.t}" y2="${H-P.b}" stroke="var(--hi)" stroke-dasharray="2 3"/>
+   <text x="${P.l}" y="${H-6}" font-size="11" fill="var(--muted)">${fmtT(t0)}</text><text x="${X(R.t)}" y="${H-6}" font-size="11" fill="var(--muted)" text-anchor="middle">maintenant</text><text x="${W-P.r}" y="${H-6}" font-size="11" fill="var(--muted)" text-anchor="end">${fmtT(t1)}</text></svg>
+   <p class="small mut">Blanc : prix passé (milieu achat/vente) · doré : prévision et fourchette${nOk?' · gris pointillé : prix du jeu normal':N?' · prix du jeu normal hors échelle':''}.</p>`}
+function futHourTxt(H,short){if(!H)return '';if(H.days<3)return `<span class="mut">🕐 Rythme de la journée : pas assez de jours complets (${H.days}).</span>`;
+  const g=H.gain!=null?futPct(Math.exp(H.gain)-1):'–';
+  if(H.ok)return `<b class="gold">🕐 Achète vers ${H.buy} h, revends vers ${H.sell} h</b>${short?` (${g})`:` : ${g} en moyenne sur les jours testés hors échantillon, vrai ${Math.round(H.hit*100)} % des jours (${H.tested} jours), écart achat/vente ≈ ${fmt1(H.spread*100)} %.`}`;
+  return short?`<span class="mut">pas de rythme fiable</span>`:`<span class="mut">🕐 Pas de rythme horaire fiable : le meilleur créneau (${H.buy} h → ${H.sell} h) donne ${g} hors échantillon, vrai ${H.hit!=null?Math.round(H.hit*100):0} % des jours (${H.tested} jours) — pas assez face à l'écart achat/vente ou au seuil du mode.</span>`}
+function futDl(){const top=Object.keys(D24).map(Number).filter(id=>MAP[id]).map(id=>[id,(D24[id].highPriceVolume||0)+(D24[id].lowPriceVolume||0)]).sort((a,b)=>b[1]-a[1]).slice(0,300).map(x=>x[0]);
+  const ids=[...new Set(futSt.recent.concat([...favs]).concat(top))].filter(id=>MAP[id]);return ids.map(id=>`<option value="${esc(MAP[id].name)}">`).join('')}
+function renderFutur(){const host=hostBox();
+  $('#intro').textContent='Tente de prédire la suite d\'un objet en comparant les historiques (ce monde, le jeu normal, les moments du passé qui ressemblaient à maintenant). Chaque méthode est d\'abord rejouée sur les derniers jours sans voir la suite : celles qui se trompent le moins pèsent le plus. Honnêtement : à 24 h, battre « le prix ne bouge pas » est rare ; le rythme de la journée est souvent le signal le plus utile.';
+  const id=futSt.id&&MAP[futSt.id]?futSt.id:null;
+  const btn=(k,v,l)=>`<button class="btn${futSt[k]===v?' primary':''}" data-fut="${k}" data-v="${v}">${l}</button>`;
+  let h=`<section class="box"><div class="fut-ctl"><label>Objet <input id="futIn" list="futDlist" placeholder="ex. Runite ore" value="${id?esc(MAP[id].name):''}" autocomplete="off"></label><datalist id="futDlist">${futDl()}</datalist>
+   <span class="fut-g">${Object.entries(FUT_HZ).map(([k,o])=>btn('hz',k,o.n)).join('')}</span><span class="fut-g">${Object.entries(FUT_MODES).map(([k,o])=>btn('mode',k,o.n)).join('')}</span>
+   <button class="btn" data-futa="scan">🔭 Scanner</button></div>
+   ${futSt.recent.length?`<p class="small">Récents : ${futSt.recent.filter(x=>MAP[x]).slice(0,8).map(x=>`<button class="linkish" data-futid="${x}">${esc(MAP[x].name)}</button>`).join(' · ')}</p>`:''}</section>`;
+  if(id){const R=FUTR[id+'|'+futSt.hz+'|'+futSt.mode];
+    if(!R){h+=`<section class="box"><p class="mut">🔮 Lecture des historiques de ${esc(MAP[id].name)}…</p></section>`;futLoad(id).then(()=>{if(tab==='futur')render()})}
+    else if(R.err)h+=`<section class="box"><p class="mut">${esc(R.err)}</p></section>`;
+    else{const pr=x=>gp(Math.exp(x));const up=R.pred>=R.now;
+      h+=`<section class="box"><div class="fut-head"><img src="${icon(MAP[id])}" alt=""><h3>${esc(MAP[id].name)}</h3><span class="pill">${FUT_HZ[R.hz].n} · ${FUT_MODES[R.mode].n}</span><span class="pill ${R.conf===2?'gold':R.conf===1?'':'warn'}">confiance ${FUT_CONF[R.conf]}</span>${R.thin?'<span class="pill warn">marché mince</span>':''}</div>
+       <div class="kv"><div><span>Maintenant</span><b>${pr(R.now)}</b></div><div><span>Dans ${R.hz==='7d'?'7 jours':R.hz}</span><b class="${R.strong?(up?'up':'down'):''}">${pr(R.pred)} <small>(${futPct(R.move)})</small></b></div>
+        <div><span>Fourchette</span><b>${pr(R.lo)} – ${pr(R.hi)}</b></div><div><span>Écart achat/vente</span><b>≈ ${fmt1(R.spread*100)} %</b></div>${R.back?`<div><span>Gain vs « ne bouge pas »</span><b class="${R.gain>0?'up':'down'}">${futPct(R.gain)}</b></div>`:''}</div>
+       <p>${R.strong?`<b class="${up?'up':'down'}">${up?'📈 Hausse':'📉 Baisse'} probable</b> : la prévision dépasse l'écart achat/vente.`:'➖ <b>Pas de mouvement fiable</b> : le prix actuel reste la meilleure estimation.'}${R.back?` <span class="small mut">(backtest : ${R.nb} essais sur les derniers jours)</span>`:' <span class="small mut">(7 jours : les Hardcore Worlds sont trop jeunes pour un backtest, poids fixes, indicatif)</span>'}</p>
+       <p>${futHourTxt(R.hours)}</p>${futChart(R)}</section>
+       <section class="box"><h3>🧮 Les méthodes</h3><div class="tablewrap"><table class="eqt"><thead><tr><th class="l">Méthode</th><th>Prévision</th><th>Erreur passée</th><th>Bon sens</th><th>Poids</th></tr></thead><tbody>
+       ${R.rows.map(r=>`<tr><td class="l">${esc(FUT_MN[r.k])}</td><td>${r.pred!=null?pr(r.pred)+' <small class="mut">'+futPct(Math.exp(r.pred-R.now)-1)+'</small>':'<span class="mut">N/A</span>'}</td><td>${r.rmse!=null?'± '+fmt1((Math.exp(r.rmse)-1)*100)+' %':'–'}</td><td>${r.pred==null?'–':r.ok?'✔':'⚠ excessif'}</td><td>${Math.round((r.w||0)*100)} %</td></tr>`).join('')}</tbody></table></div>
+       ${R.matches&&R.matches.length?`<h3>🔁 Moments du passé qui ressemblaient à maintenant</h3><ul class="list">${R.matches.map(m=>`<li><span>${new Date(m.t*1000).toLocaleString('fr-BE',{weekday:'short',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</span><span>ensuite : <b class="${m.after>=0?'up':'down'}">${futPct(Math.exp(m.after)-1)}</b></span></li>`).join('')}</ul>`:''}</section>`}}
+  else h+=`<section class="box"><p class="mut">Choisis un objet (tape son nom) ou lance 🔭 Scanner pour passer en revue tes favoris et les objets les plus échangés.</p></section>`;
+  if(futBusy)h+=`<section class="box"><p>🔭 Scan en cours… ${esc(futBusy)}</p></section>`;
+  if(futScan){const L=futScan.rows;h+=`<section class="box"><h3>🔭 Scanner · ${FUT_HZ[futScan.hz].n} · ${FUT_MODES[futScan.mode].n}</h3><p class="small mut">${L.length} objets en ${fmt1(futScan.ms/1000)} s. Classés : conseil fort → rythme horaire → rien (rien n'est caché). Clique une ligne pour le détail.</p>
+    <div class="tablewrap"><table class="eqt"><thead><tr><th class="l">Objet</th><th>Prix</th><th>Prévision</th><th>Confiance</th><th class="l">Rythme de la journée</th></tr></thead><tbody>
+    ${L.map(x=>`<tr data-futid="${x.id}" style="cursor:pointer"><td class="l"><img src="${icon(MAP[x.id])}" alt="">${esc(MAP[x.id].name)}</td>${x.R&&!x.R.err?`<td>${gp(Math.exp(x.R.now))}</td><td class="${x.R.strong?(x.R.move>=0?'up':'down'):'mut'}">${futPct(x.R.move)}${x.R.strong?' ★':''}</td><td>${FUT_CONF[x.R.conf]}</td><td class="l small">${futHourTxt(x.R.hours,true)}</td>`:'<td colspan="4" class="mut">N/A (pas assez d\'historique)</td>'}</tr>`).join('')}</tbody></table></div></section>`}
+  host.innerHTML=h}
+async function futRunScan(){if(futBusy)return;const t0=performance.now(),hz=futSt.hz==='7d'?'24h':futSt.hz,mode=futSt.mode;
+  const top=Object.keys(D24).map(Number).filter(id=>MAP[id]&&D24[id]).map(id=>{const d=D24[id],tr=(d.highPriceVolume||0)+(d.lowPriceVolume||0);return{id,tr,gpv:(d.avgHighPrice||0)*(d.highPriceVolume||0)+(d.avgLowPrice||0)*(d.lowPriceVolume||0)}}).filter(x=>x.tr>=200).sort((a,b)=>b.gpv-a.gpv).slice(0,30).map(x=>x.id);
+  const ids=[...new Set([...favs].filter(id=>MAP[id]).concat(top))],rows=[];let done=0;futBusy=`0 / ${ids.length}`;render();
+    const work=async id=>{let R=null;try{R=await futLoad(id,hz,mode)}catch(e){R={err:e.message}}rows.push({id,R});done++;futBusy=`${done} / ${ids.length}`;const p=document.querySelector('#alertsHost');if(tab==='futur'&&p){const s=[...p.querySelectorAll('section p')].find(x=>x.textContent.startsWith('🔭 Scan'));if(s)s.textContent='🔭 Scan en cours… '+futBusy}};
+  for(let i=0;i<ids.length;i+=4)await Promise.all(ids.slice(i,i+4).map(work));
+  const cls=x=>!x.R||x.R.err?-1:x.R.strong?2:x.R.hours&&x.R.hours.ok?1:0;
+  rows.sort((a,b)=>cls(b)-cls(a)||((b.R&&!b.R.err?Math.abs(b.R.move):0)-(a.R&&!a.R.err?Math.abs(a.R.move):0)));
+  futScan={hz,mode,rows,ms:performance.now()-t0};futBusy=null;if(tab==='futur')render()}
+function futPick(id){if(!MAP[id])return;futSt.id=id;futSt.recent=[id].concat(futSt.recent.filter(x=>x!==id)).slice(0,12);futSave();render()}
+VIEWS.futur={label:'Le futur 🔮',custom:true,render:()=>renderFutur()};
+MOVES.futur=['🔎 Choisis un objet','🧮 Les méthodes sont rejouées sur le passé','🕐 Achète et revends au bon moment'];
+NEWTABS.add('futur');
+{const g=GROUPS.find(x=>x[0]==='ge');if(g&&!g[2].includes('futur'))g[2].push('futur')}
+document.addEventListener('click',e=>{if(tab!=='futur')return;const t=e.target.closest('[data-fut],[data-futa],[data-futid]');if(!t)return;
+  if(t.dataset.futid){futPick(+t.dataset.futid);return}
+  if(t.dataset.futa==='scan'){futRunScan();return}
+  futSt[t.dataset.fut]=t.dataset.v;futSave();render()});
+document.addEventListener('change',e=>{if(tab!=='futur'||e.target.id!=='futIn')return;const id=BYNAME[(e.target.value||'').trim().toLowerCase()];if(id)futPick(id)});
+document.addEventListener('keydown',e=>{if(tab!=='futur'||e.target.id!=='futIn'||e.key!=='Enter')return;const id=BYNAME[(e.target.value||'').trim().toLowerCase()];if(id)futPick(id)});
+{const st=document.createElement('style');st.textContent=`.fut-ctl{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center}.fut-ctl input{min-width:220px}.fut-g{display:inline-flex;gap:4px;flex-wrap:wrap}
+.fut-head{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.fut-head h3{margin:0}.fut-head img{height:28px}`;document.head.appendChild(st)}
 
 /* v1.0 : démarrage du portail */
 try{const qp=new URLSearchParams(location.search);if(qp.get('panel')==='1')store.set('compact',true);if(qp.get('panel')==='0')store.set('compact',false);if(qp.get('world')&&qp.get('world')!==WORLD&&/^(hc|osrs)$/.test(qp.get('world'))){localStorage.setItem('hcx_world',JSON.stringify(qp.get('world')));location.replace(location.pathname+(qp.get('panel')?'?panel='+qp.get('panel'):''))}}catch(e){}

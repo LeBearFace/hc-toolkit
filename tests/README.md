@@ -7,3 +7,5 @@
 `node tests/header.js $PWD/index.html` : la barre du haut tient dans l'écran (560 à 1500 px).
 
 Les vrais prix se testent dans le navigateur intégré sur /test/ (le conteneur ne joint pas le wiki).
+`node tests/boss.js $PWD/test/index.html` : 🎯 simulateurs de boss (ticks, fenêtre de prière, Jad, 3 Jads, Hunllef, Zuk, records, clavier, 😴 AFK, ?afk=1, 560 px).
+`node tests/futur.js $PWD/test/index.html` : 🔮 Le futur avec des séries fictives (marche au hasard, cycle horaire, tendance, écart HC/normal plafonné, trous, 7 jours, scanner, 560 px).
