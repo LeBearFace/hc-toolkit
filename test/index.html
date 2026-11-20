@@ -316,6 +316,27 @@ body.osrs .bonds{display:none}
 .opp .why{grid-column:1/-1;font-size:12px;color:var(--muted)}
 .h2s{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
 .h2s h3{margin:0}
+/* 1.9 vitrine */
+.vt-hero{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;justify-content:space-between;padding:12px 16px;background:linear-gradient(110deg,#4a2a16,#3e3529 60%);border:3px solid var(--line);border-radius:4px;box-shadow:inset 0 0 0 1px var(--hi)}
+.vt-hero h2{margin:0;font:700 24px/1.1 var(--f-display);color:var(--yel);text-shadow:2px 2px 0 #000}.vt-hero p{margin:2px 0 0}
+.vt-hr{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.vt-skip{font:600 13px var(--f-display);color:var(--yel);background:#2f281e;border:2px solid var(--line);border-radius:3px;padding:6px 10px;cursor:pointer}.vt-skip:hover{background:#3a3125}
+.vt-f{display:flex;flex-direction:column;gap:6px;padding:10px 12px;border:2px solid var(--line);border-radius:3px;background:#2f281e}
+.vt-fr{display:flex;flex-wrap:wrap;gap:5px;align-items:center}.vt-fl{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);min-width:118px}
+.vt-fd{margin:0 0 2px;color:var(--muted)}
+.vt-chip{font:600 12.5px var(--f-body);color:var(--fg);background:#3a3125;border:2px solid var(--line);border-radius:12px;padding:3px 10px;cursor:pointer}
+.vt-chip:hover{border-color:var(--hi)}.vt-chip.on{background:linear-gradient(#94351f,var(--sel));color:var(--yel);box-shadow:inset 1px 1px 0 #b04a30}
+.vt-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,250px),1fr));gap:10px;margin-top:8px}.vt-grid.vt-sm{grid-template-columns:repeat(auto-fill,minmax(min(100%,200px),1fr))}
+.vt-card{display:flex;flex-direction:column;gap:4px;padding:10px 12px;border:3px solid var(--line);border-radius:4px;background:linear-gradient(#43382a,#3a3125);box-shadow:inset 0 0 0 1px var(--hi);cursor:pointer;min-width:0}
+.vt-card:hover,.vt-card:focus{background:linear-gradient(#4f4231,#43382a);transform:translateY(-1px);outline:none}
+.vt-card header{display:flex;gap:6px;align-items:center;min-width:0}.vt-card header b{font:600 15px var(--f-display);color:var(--gold);text-shadow:1px 1px 0 #000;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
+.vt-card header img{width:24px;height:24px;object-fit:contain}
+.vt-big{font:700 22px var(--f-display);text-shadow:1px 1px 0 #000}.vt-sub{color:var(--fg)}
+.vt-icons{display:flex;flex-wrap:wrap;gap:3px;align-items:center;min-height:28px}.vt-icons img{width:26px;height:26px;object-fit:contain;background:#2b251c;border:1px solid var(--line);border-radius:3px;padding:1px}
+.vt-kv{display:flex;flex-wrap:wrap;gap:4px 10px;color:var(--muted)}.vt-kv span::before{content:"· ";color:var(--hi)}.vt-kv span:first-child::before{content:""}
+.vt-steps{margin:2px 0 0;padding-left:16px;color:var(--fg)}.vt-why{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vt-loc{min-height:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.vt-foot{color:var(--muted);text-align:center}
+@media (max-width:520px){.vt-fl{min-width:0;width:100%}.vt-big{font-size:19px}}
 /* palette de commandes */
 .pal{position:fixed;inset:0;z-index:90;display:flex;justify-content:center;align-items:flex-start;padding:12vh 12px 12px;background:rgba(0,0,0,.55)}
 .pal-b{width:min(620px,100%);background:var(--panel);border:3px solid var(--line);border-radius:4px;box-shadow:inset 0 0 0 1px var(--hi),0 20px 50px rgba(0,0,0,.6);overflow:hidden}
@@ -363,7 +384,7 @@ body.compact .atl-mods{grid-template-columns:1fr}
 <body>
 <header id="hd">
   <div class="bar">
-    <div class="logo"><button class="logo-b" data-tab="home" title="Accueil"><span class="logo-mark" aria-hidden="true">HC</span><span class="logo-t">HC Toolkit</span></button><small class="logo-s">Hardcore Worlds · <button class="linkish" id="changelog" title="Nouveautés">v1.8</button></small></div>
+    <div class="logo"><button class="logo-b" data-tab="home" title="Accueil"><span class="logo-mark" aria-hidden="true">HC</span><span class="logo-t">HC Toolkit</span></button><small class="logo-s">Hardcore Worlds · <button class="linkish" id="changelog" title="Nouveautés">v1.9</button></small></div>
     <div class="search"><input id="q" type="search" placeholder="Rechercher un objet…   ( / )" autocomplete="off"><button class="btn kbtn" id="palBtn" title="Aller n'importe où (Ctrl+K)">⌘K</button></div>
     <div class="ctrl">
       <span class="status" id="status">Chargement…</span>
@@ -466,6 +487,7 @@ async function loadQuestXp(){
     return out}catch(e){return []}
 }
 let tab=store.get('tab','home'), sortState=store.get('sort',{}), shown=200, autoTimer=null;
+let vtBoot=null;if(settings.vtLaunch!==false&&tab!=='home'){vtBoot=tab;tab='home'} // 1.9 : la vitrine s'ouvre au lancement, « Passer » ramène ici
 
 /* ---------- format ---------- */
 const nf=new Intl.NumberFormat('fr-BE');
@@ -1243,6 +1265,7 @@ function renderTabs(){
 }
 function render(){
   if(!VIEWS[tab]||modHidden(tab))tab='home';
+  if(tab!=='home')vtBoot=tab; // 1.9 : dernier module ouvert (bouton « Passer » de la vitrine)
   renderTabs();
   const v=VIEWS[tab];$('#error').hidden=true;
   if(v.custom){(v.render||renderAlerts)();return}
@@ -1861,12 +1884,12 @@ const HOME_TILES=[['advice','💰','Conseils','Ta liste de courses selon ton cap
   ['instant','⚡','Achat immédiat','Ce qui rapporte tout de suite'],['favs','★','Favoris en direct','Prix toutes les 10 s, flèches'],['offcuts','🐟','Fish offcuts','Poissons de Frankie → offcuts'],
   ['sticks','🌴','Trading sticks','Gemmes → sticks → machettes'],['ship','⛵','Chantier naval','Pièces de bateau, offres basses'],['dir','📍','Annuaire PNJ','Carte, stock, accès et prérequis'],
   ['craft','🔨','Fabrication','Toutes les recettes rentables'],['prog','🎯','Progression','Ton plan d\'XP le moins cher'],['flips','📈','Flips','Acheter bas, revendre haut']];
-function renderHome(){const host=hostBox();$('#intro').textContent='';
+function renderHomeClassic(){const host=hostBox();$('#intro').textContent='';
   let opps=[];try{opps=adviceList().list.slice(0,6)}catch(e){}
   const favL=[...favs].filter(id=>MAP[id]).slice(0,8);
   const fresh=lastUpdate?ago2(lastUpdate):'?';
   const bond=LAT[BOND]||{};
-  let h=`<div class="home"><section class="hero"><div><h2>HC Toolkit</h2><p>Ton tableau de bord ${WORLD==='osrs'?'pour le jeu normal (taxe GE de 2 % déduite partout où tu revends au GE)':'pour les Hardcore Worlds (sans taxe GE, une seule vie)'}. Prix en direct, PNJ, recettes et plans : tout est calculé avec les prix du moment.</p></div>
+  let h=`<div class="home"><section class="hero"><div><h2>HC Toolkit <button class="vt-chip on" data-vthome="1" style="vertical-align:middle">🏪 Vitrine</button></h2><p>Ton tableau de bord ${WORLD==='osrs'?'pour le jeu normal (taxe GE de 2 % déduite partout où tu revends au GE)':'pour les Hardcore Worlds (sans taxe GE, une seule vie)'}. Prix en direct, PNJ, recettes et plans : tout est calculé avec les prix du moment.</p></div>
     <div class="seg" role="group" aria-label="Monde"><button data-world="hc" class="${WORLD==='hc'?'on':''}">Hardcore Worlds</button><button data-world="osrs" class="${WORLD==='osrs'?'on':''}">OSRS normal</button></div></section>
     <section class="stats"><div class="stat"><span>Prix mis à jour</span><b>${fresh}</b></div><div class="stat"><span>Bond (achat rapide)</span><b>${bond.high?gp(bond.high):'–'}</b></div>
      <div class="stat"><span>Objets suivis</span><b>${Object.keys(LAT).length?nf.format(Object.keys(LAT).length):'–'}</b></div><div class="stat"><span>Favoris</span><b>${favs.size}</b></div><div class="stat"><span>Alertes</span><b>${rules.length}</b></div>
@@ -1877,6 +1900,115 @@ function renderHome(){const host=hostBox();$('#intro').textContent='';
     ${favL.length?`<section class="box"><div class="h2s"><h3>Tes favoris</h3><button class="linkish" data-tab="favs">en direct →</button></div><div class="tablewrap"><table><thead><tr><th class="l">Objet</th><th>Achat</th><th>Vente</th><th>Marge</th><th>Vol. 24 h</th></tr></thead><tbody>${favL.map(id=>{const b=base(id);return `<tr data-id="${id}"><td class="l">${itemCell(b)}</td><td class="num">${gpc(b.buy)}</td><td class="num">${gpc(b.sell)}</td><td class="num"><span class="${cls(b.margin)}">${gp(b.margin)}</span></td><td class="num">${gp(b.v24)}</td></tr>`}).join('')}</tbody></table></div></section>`:''}
     <section class="box"><h3>Raccourcis</h3><ul class="list"><li><span><b>Ctrl+K</b> : aller à n'importe quel module, objet ou magasin</span></li><li><span><b>/</b> : chercher un objet dans la liste</span></li><li><span><b>⇔ Panneau</b> : interface étroite à coller à côté du jeu (le lanceur « à côté du jeu » l'active)</span></li></ul></section></div>`;
   host.innerHTML=h}
+
+/* ===== 1.9 « Vitrine » : écran d'accueil en cartes (packs PNJ, achats à saisir, mouvements) ===== */
+const VT_DEF={mode:'bal',W:5,budget:0,qmax:0,minGain:5000,sec:20,kinds:{pack:1,inst:1,move:1}};
+function vtS(){if(!settings.vt||typeof settings.vt!=='object')settings.vt={};const S=settings.vt;for(const k in VT_DEF)if(S[k]==null)S[k]=JSON.parse(JSON.stringify(VT_DEF[k]));return S}
+const VT_MODES={
+  fast:{t:'⚡ Plus rapide',d:'Achat instantané au GE. Dans chaque monde, tu ne vends que les premiers objets (ceux qui rapportent au moins la moitié du premier) : moins de clics, tournée plus courte.',floor:.5,patient:false},
+  bal:{t:'⚖️ Équilibré',d:'Achat instantané au GE. Dans chaque monde, tu vends tant que c\'est rentable.',floor:0,patient:false},
+  rich:{t:'💰 Plus rentable',d:'Offre basse au GE (prix bas habituel sur 24 h) : il faut attendre que l\'offre passe, mais chaque objet rapporte plus. Puis tu vends tant que c\'est rentable.',floor:0,patient:true}};
+const VT_BUDGETS=[[0,'Illimité'],[1e5,'100 k'],[1e6,'1 M'],[1e7,'10 M'],[1e8,'100 M']];
+const VT_QTY=[[0,'Sans limite'],[10,'≤ 10'],[100,'≤ 100'],[1000,'≤ 1 000']];
+function vtPrice(id,patient){const l=LAT[id]||{},d=D24[id]||{};return patient?(Math.round(d.avgLowPrice||l.low||0)||null):(instPrice(id)||null)}
+/* Un pack = tout ce qu'un même PNJ rachète avec profit, acheté d'un coup au GE puis revendu monde après monde */
+function vtPacks(){const S=vtS(),M=VT_MODES[S.mode]||VT_MODES.bal,W=Math.max(1,S.W|0);const by={};
+  SHOPS.forEach(x=>{if(!(x.buy>0)||x.danger)return;(by[x.shop]=by[x.shop]||[]).push(x)});
+  const out=[];
+  for(const shop in by){const seen=new Set();let items=[];
+    by[shop].forEach(x=>{const id=BYNAME[x.item.toLowerCase()];const m=id&&MAP[id];if(!m||!m.value||seen.has(id)||id==BOND)return;seen.add(id);
+      const P=vtPrice(id,M.patient);if(!P)return;const d=D24[id]||{};
+      const first=Math.max(x.buy,Math.floor(m.value*glovePct(shop,0)/100));const p1=first-P;if(p1<50)return; // moins de 50 gp : pas la peine de l'acheter
+      const pct=first/m.value*100,chg=(x.delta||0)/10,fixed=!chg;const seq=[];
+      if(fixed)seq.push(p1);else for(let k=0;k<200;k++){const p=Math.floor(m.value*Math.max(10,pct-k*chg)/100);const g=p-P;if(g<=0||(k>0&&g<p1*M.floor))break;seq.push(g)}
+      const v24=(d.highPriceVolume||0)+(d.lowPriceVolume||0);const cap=Math.min(m.limit||Infinity,Math.max(1,Math.floor(v24/6))); // limite GE (4 h) et ce que le marché échange en 4 h
+      let Q=fixed?cap:seq.length*W;Q=Math.min(Q,cap,S.qmax||Infinity);if(!isFinite(Q))Q=Math.min(cap,500);if(Q<1)return;
+      items.push({id,name:m.name,P,first,p1,seq,fixed,Q,v24,limit:m.limit||null,cap,thin:v24<100})});
+    if(!items.length)continue;
+    const calc=it=>{const u=it.seq.length;if(it.fixed){it.per=it.Q;it.worlds=1;it.profit=it.Q*it.p1}else{const full=Math.floor(it.Q/u),rem=it.Q%u;const su=it.seq.reduce((a,b)=>a+b,0);
+      it.profit=full*su+it.seq.slice(0,rem).reduce((a,b)=>a+b,0);it.per=u;it.worlds=Math.ceil(it.Q/u)}it.cost=it.Q*it.P;return it};
+    items.forEach(calc);
+    if(S.budget){items.sort((a,b)=>b.profit/b.cost-a.profit/a.cost);let rem=S.budget;const keep=[];
+      for(const it of items){if(rem<it.P)continue;if(it.cost>rem){it.Q=Math.floor(rem/it.P);calc(it)}rem-=it.cost;keep.push(it)}items=keep}
+    items=items.filter(it=>it.Q>=1&&it.profit>0).sort((a,b)=>b.profit-a.profit);if(!items.length)continue;
+    const profit=items.reduce((a,x)=>a+x.profit,0),cost=items.reduce((a,x)=>a+x.cost,0);const wmax=Math.max(...items.map(x=>x.worlds));
+    const perWorld=items.reduce((a,x)=>a+x.seq.slice(0,Math.min(x.per,x.Q)).reduce((s,g)=>s+g,0),0);
+    const min=3+wmax*(S.sec+3*items.length)/60+(M.patient?0:0); // 3 min de trajet + GE, puis chaque monde : changement + ventes
+    const gph=profit/min*60;
+    if(profit<S.minGain)continue;
+    out.push({shop,items,n:items.length,profit,cost,perWorld,wmax,min,gph,fixed:items.every(x=>x.fixed),thin:items.some(x=>x.thin),loc:(SHOPINFO[shop]||{}).loc||''})}
+  const sc=p=>S.mode==='fast'?p.gph:S.mode==='rich'?p.profit:Math.sqrt(p.profit*p.gph);
+  return out.sort((a,b)=>sc(b)-sc(a))}
+/* Achats à saisir : alchimie, fabrication, packs à ouvrir, ensembles (la revente PNJ est déjà dans les packs) */
+function vtInst(){const S=vtS();let rows=[];try{rows=instantRows()}catch(e){return[]}
+  const seen=new Set();const out=[];
+  rows.filter(r=>r.use!=='PNJ').sort((a,b)=>b.lotProfit-a.lotProfit).forEach(r=>{const k=(r.use||'')+':'+(r.id||r.name);if(seen.has(k))return;seen.add(k);
+    let lot=r.lot||1;if(S.qmax)lot=Math.min(lot,S.qmax);if(S.budget&&r.ip)lot=Math.min(lot,Math.floor(S.budget/r.ip));if(lot<1)return;
+    const lp=Math.round((r.unit||0)*lot);if(lp<S.minGain)return;out.push(Object.assign({},r,{vlot:lot,vprofit:lp,vcost:Math.round((r.ip||0)*lot)}))});
+  return out.sort((a,b)=>b.vprofit-a.vprofit)}
+function vtMoves(){let r=[];try{r=cleanRows().filter(x=>x.chg!=null&&Math.abs(x.chg)>=Math.max(5,settings.hitPct||10)&&x.v1>=Math.max(50,settings.hitVol||200))}catch(e){}
+  return r.sort((a,b)=>Math.abs(b.chg)-Math.abs(a.chg)).slice(0,6)}
+const vtIco=id=>{const m=MAP[id];return m?`<img loading="lazy" src="${icon(m)}" alt="" title="${esc(m.name)}">`:''};
+let VTP=[];
+function renderHome(){if(settings.homeClassic){renderHomeClassic();return}
+  const host=hostBox();$('#intro').textContent='';const S=vtS(),M=VT_MODES[S.mode]||VT_MODES.bal;
+  const packs=S.kinds.pack?vtPacks():[];VTP=packs;const inst=S.kinds.inst?vtInst():[];const mv=S.kinds.move?vtMoves():[];
+  const fresh=lastUpdate?ago2(lastUpdate):'?';const prevL=vtBoot&&VIEWS[vtBoot]&&vtBoot!=='home'?VIEWS[vtBoot].label:null;
+  const chip=(k,v,t,on)=>`<button class="vt-chip ${on?'on':''}" data-vt="${k}" data-v="${v}">${t}</button>`;
+  let h=`<div class="home vt">
+  <section class="vt-hero"><div><h2>🏪 Vitrine</h2><p class="small">${WORLD==='osrs'?'OSRS normal · taxe GE de 2 % déduite':'Hardcore Worlds · sans taxe GE'} · prix ${fresh}</p></div>
+   <div class="vt-hr"><div class="seg" role="group" aria-label="Monde"><button data-world="hc" class="${WORLD==='hc'?'on':''}">Hardcore</button><button data-world="osrs" class="${WORLD==='osrs'?'on':''}">OSRS normal</button></div>
+   ${prevL?`<button class="vt-skip" data-tab="${vtBoot}" title="Reprendre là où tu étais">Passer → ${esc(prevL)}</button>`:''}</div></section>
+  <section class="vt-f">
+   <div class="vt-fr"><span class="vt-fl">Intensité</span>${Object.entries(VT_MODES).map(([k,m])=>chip('mode',k,m.t,S.mode===k)).join('')}</div>
+   <p class="vt-fd small">${esc(M.d)}</p>
+   <div class="vt-fr"><span class="vt-fl" title="Combien de mondes tu es prêt à visiter pour revendre aux PNJ">Mondes</span>${[1,3,5,10,20].map(w=>chip('W',w,w,S.W==w)).join('')}</div>
+   <div class="vt-fr"><span class="vt-fl" title="Capital maximum par carte">Budget</span>${VT_BUDGETS.map(([v,t])=>chip('budget',v,t,S.budget==v)).join('')}</div>
+   <div class="vt-fr"><span class="vt-fl" title="Quantité maximale à acheter par objet">Quantité / objet</span>${VT_QTY.map(([v,t])=>chip('qmax',v,t,S.qmax==v)).join('')}</div>
+   <div class="vt-fr"><span class="vt-fl">Gain min</span>${[[1000,'1 k'],[5000,'5 k'],[25000,'25 k'],[100000,'100 k']].map(([v,t])=>chip('minGain',v,t,S.minGain==v)).join('')}
+    <span class="vt-fl" style="margin-left:10px">Afficher</span>${[['pack','🎒 Packs PNJ'],['inst','⚡ À saisir'],['move','📈 Ça bouge']].map(([k,t])=>`<button class="vt-chip ${S.kinds[k]?'on':''}" data-vtk="${k}">${t}</button>`).join('')}</div>
+  </section>`;
+  if(S.kinds.pack){h+=`<section><div class="h2s"><h3>🎒 Packs PNJ <span class="mut small">· un marchand, plusieurs objets, ${S.W} monde${S.W>1?'s':''}</span></h3><button class="linkish" data-tab="tour">classement complet →</button></div>`;
+    h+=packs.length?`<div class="vt-grid">${packs.slice(0,9).map((p,i)=>`<article class="vt-card" data-vtp="${i}" tabindex="0">
+      <header><b>${esc(p.shop)}</b>${i===0?'<span class="pill gold">⭐ conseillé</span>':''}</header>
+      <div class="vt-loc small mut">${esc(p.loc||'')}</div>
+      <div class="vt-big up">+${gp(p.profit)}</div>
+      <div class="vt-sub small">${p.fixed?'prix fixe, pas besoin de changer de monde':`≈ +${gp(p.perWorld)} par monde · ${p.wmax} monde${p.wmax>1?'s':''}`}</div>
+      <div class="vt-icons">${p.items.slice(0,8).map(x=>vtIco(x.id)).join('')}${p.n>8?`<span class="small mut">+${p.n-8}</span>`:''}</div>
+      <div class="vt-kv small"><span>${p.n} objet${p.n>1?'s':''}</span><span>capital ${gp(p.cost)}</span><span>≈ ${Math.round(p.min)} min</span><span>${gp(p.gph)}/h</span></div>
+      ${p.thin?'<div class="small warn-t">⚠ un objet peu échangé : achète par petits lots</div>':''}</article>`).join('')}</div>`
+      :`<p class="mut small">Aucun pack ne passe ces filtres. Monte le budget, baisse le gain minimum ou ajoute des mondes.</p>`;h+='</section>'}
+  if(S.kinds.inst){h+=`<section><div class="h2s"><h3>⚡ À saisir maintenant <span class="mut small">· alchimie, fabrication, packs à ouvrir, ensembles</span></h3><button class="linkish" data-tab="instant">tout voir →</button></div>`;
+    h+=inst.length?`<div class="vt-grid">${inst.slice(0,6).map(r=>`<article class="vt-card" data-item="${r.id}" tabindex="0">
+      <header>${vtIco(r.id)}<b>${esc(r.name||'')}</b><span class="pill ${r.useCls||''}">${esc(r.use||'')}</span></header>
+      <div class="vt-big up">+${gp(r.vprofit)}</div><div class="vt-sub small">${nf.format(r.vlot)} × +${gp(r.unit)} · capital ${gp(r.vcost)}</div>
+      <ul class="vt-steps small">${(r.move||['⚡ Achète au GE à '+gp(r.ip)]).slice(0,3).map(s=>`<li>${esc(s)}</li>`).join('')}</ul>
+      ${r.why?`<div class="small mut vt-why">${esc(String(r.why).slice(0,110))}</div>`:''}</article>`).join('')}</div>`
+      :`<p class="mut small">Rien à saisir avec ces filtres pour le moment.</p>`;h+='</section>'}
+  if(S.kinds.move){h+=`<section><div class="h2s"><h3>📈 Ça bouge <span class="mut small">· dernière heure contre moyenne 24 h</span></h3><button class="linkish" data-tab="hits">tout voir →</button></div>`;
+    h+=mv.length?`<div class="vt-grid vt-sm">${mv.map(b=>`<article class="vt-card" data-item="${b.id}" tabindex="0"><header>${vtIco(b.id)}<b>${esc(b.name)}</b></header>
+      <div class="vt-big ${b.chg>0?'up':'down'}">${b.chg>0?'▲ +':'▼ '}${pct(b.chg)}</div><div class="vt-sub small">achat ${gp(b.buy)} · vente ${gp(b.sell)} · ${gp(b.v1)} échangés / h</div></article>`).join('')}</div>`
+      :`<p class="mut small">Marché calme : aucun gros mouvement pour l'instant.</p>`;h+='</section>'}
+  h+=`<section class="vt-foot small"><button class="linkish" data-vtclassic="1">Afficher l'accueil classique (tuiles, favoris)</button> · <label><input type="checkbox" id="vtLaunch" ${settings.vtLaunch!==false?'checked':''}> Ouvrir la vitrine au lancement</label></section></div>`;
+  host.innerHTML=h}
+function vtPackWin(p){const S=vtS(),M=VT_MODES[S.mode]||VT_MODES.bal;
+  const html=`<div class="kv" style="margin-top:4px"><div><span>Profit total</span><b class="up">+${gp(p.profit)}</b></div><div><span>Capital</span><b>${gpc(p.cost)}</b></div><div><span>${p.fixed?'Mondes':'Par monde'}</span><b>${p.fixed?'1 suffit':'+'+gp(p.perWorld)}</b></div><div><span>Durée ≈</span><b>${Math.round(p.min)} min</b></div><div><span>gp/h ≈</span><b>${gp(p.gph)}</b></div></div>
+   <h3 class="wt">1. Achète au GE ${M.patient?'(offre basse, attends qu\'elle passe)':'(achat instantané)'}</h3>
+   <div class="tablewrap"><table><thead><tr><th class="l">Objet</th><th>Quantité</th><th>Prix max</th><th>PNJ paie</th><th>Par monde</th><th>Profit</th></tr></thead><tbody>${p.items.map(x=>`<tr data-id="${x.id}"><td class="l">${itemCell(base(x.id))}${x.thin?' <span class="pill warn" title="Moins de 100 échanges sur 24 h">peu échangé</span>':''}</td><td class="num"><b>${nf.format(x.Q)}</b>${x.limit&&x.Q>=x.limit?' <span class="mut" title="Limite GE sur 4 h">lim.</span>':''}</td><td class="num">${gp(x.P)}</td><td class="num">${gp(x.first)}</td><td class="num">${x.fixed?'∞':x.per}</td><td class="num up">+${gp(x.profit)}</td></tr>`).join('')}</tbody></table></div>
+   <h3 class="wt">2. Revends à ${esc(p.shop)}</h3><p class="small">${p.fixed?'Prix fixe : vends tout dans le même monde.':`Vends la quantité « par monde », puis change de monde (${p.wmax} au total). Le prix remonte dans chaque nouveau monde.`}</p>
+   <p class="small"><button class="linkish" id="vtCopy">📋 Copier la liste d'achat</button> · <button class="linkish" data-sw="${esc(p.shop)}">📍 Carte et stock du magasin</button> <span id="vtCopyMsg" class="mut"></span></p>
+   <details class="accd" open><summary>📍 Accès et prérequis${p.loc?' — '+esc(p.loc):''}</summary><div id="vtAcc"></div></details>`;
+  const w=openWin('vtp:'+p.shop,'🎒 Pack '+p.shop,html);fillAccess(p.shop,w.querySelector('#vtAcc'));
+  w.querySelector('#vtCopy').onclick=()=>{const t=`Pack PNJ — ${p.shop}\n`+p.items.map(x=>`${x.Q} × ${x.name} (max ${x.P} gp) → ${x.fixed?'tout':x.per+' par monde'}`).join('\n')+`\nProfit ≈ ${gp(p.profit)} · capital ${gp(p.cost)}`;
+    navigator.clipboard&&navigator.clipboard.writeText(t).then(()=>{w.querySelector('#vtCopyMsg').textContent='copié ✔'},()=>{w.querySelector('#vtCopyMsg').textContent='copie refusée'})}}
+document.addEventListener('click',e=>{if(tab!=='home')return;const t=e.target.closest('[data-vt],[data-vtk],[data-vtp],[data-vtclassic],[data-vthome]');if(!t)return;e.stopPropagation();const S=vtS();
+  if(t.dataset.vt){e.stopPropagation();const k=t.dataset.vt,v=t.dataset.v;S[k]=k==='mode'?v:+v;saveSettings();renderHome();return}
+  if(t.dataset.vtk){S.kinds[t.dataset.vtk]=S.kinds[t.dataset.vtk]?0:1;saveSettings();renderHome();return}
+  if(t.dataset.vtp!=null){const p=VTP[+t.dataset.vtp];if(p)vtPackWin(p);return}
+  if(t.dataset.vtclassic){settings.homeClassic=true;saveSettings();renderHome();return}
+  if(t.dataset.vthome){settings.homeClassic=false;saveSettings();renderHome();return}},true);
+document.addEventListener('change',e=>{if(e.target.id==='vtLaunch'){settings.vtLaunch=e.target.checked;saveSettings()}});
+document.addEventListener('keydown',e=>{if(tab!=='home'||e.key!=='Enter')return;const c=e.target.closest&&e.target.closest('.vt-card');if(c)c.click()});
 
 /* ---------- tournée PNJ : 1 objet par monde ---------- */
 function bidOf(id){const l=LAT[id]||{},d=D24[id]||{};return Math.round(d.avgLowPrice||l.low||0)||null} // offre basse habituelle : moyenne 24 h des ventes instantanées
@@ -2065,6 +2197,10 @@ function setLive(sec){liveSec=+sec;store.set('liveSec',liveSec);clearInterval(li
 function favRows(){const ids=[...favs].filter(id=>MAP[id]);hcwWant(ids);wantSpark(ids);return ids.map(id=>base(id))}
 
 const CHANGELOG=`<div class="dh"><h2>Nouveautés</h2><button class="btn" id="close">Fermer</button></div>
+ <div class="box"><h3>v1.9 « Vitrine » · 20 novembre 2026</h3><ul class="list"><li><span><b>🏪 Vitrine</b> : nouvel accueil en cartes, ouvert au lancement. « Passer → » te ramène au dernier module ; l'accueil classique reste à un clic.</span></li>
+  <li><span><b>🎒 Packs PNJ</b> : pour chaque marchand, tous les objets qu'il rachète avec profit, à acheter d'un coup au GE (quantité calculée pour tes mondes, plafonnée par la limite GE et le volume réel), puis à revendre monde après monde. Fenêtre détaillée avec liste d'achat à copier et accès.</span></li>
+  <li><span><b>Filtres</b> : intensité (⚡ plus rapide / ⚖️ équilibré / 💰 plus rentable), nombre de mondes, budget, quantité max par objet, gain minimum, sections à afficher.</span></li>
+  <li><span><b>⚡ À saisir</b> (alch, fabrication, packs à ouvrir, ensembles) et <b>📈 Ça bouge</b> sur la même page.</span></li></ul></div>
  <div class="box"><h3>v1.8 « Portefeuille » · 20 novembre 2026</h3><ul class="list"><li><span><b>💼 Mon portefeuille</b> (📈 Bourse) : note tes achats et ventes en 1 ligne (prix du moment pré-rempli) ou importe-les (plugin Flipping Utilities, ou ta banque via Data Export). Prix moyen, valeur, gain latent et réalisé (FIFO, taxe GE comptée sur le jeu normal), par perso, graphique avec tes achats ▲ et ventes ▼, journal. <b>Alertes silencieuses</b> quand un objet que tu as pompe (😴 +15 % / ⚖️ +8 % / 🔥 +4 %), chute, ou grimpe vite ; notification Windows en option.</span></li></ul></div>
  <div class="box"><h3>v1.7.1 · 20 novembre 2026</h3><ul class="list"><li><span><b>🔨 Ce que tu peux fabriquer avec</b> (dans la fiche de chaque objet) : toutes les recettes qui l'utilisent, classées par profit, avec les niveaux requis (🔒 si ton perso ne les a pas) et, pour chacune, la liste complète à acheter pour N fabrications (GE, PNJ ou fabriqué toi-même), coût, revente, profit, XP et temps.</span></li></ul></div>
  <div class="box"><h3>v1.7 « Arène & Futur » · 20 novembre 2026</h3><ul class="list">
