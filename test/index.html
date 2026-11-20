@@ -363,7 +363,7 @@ body.compact .atl-mods{grid-template-columns:1fr}
 <body>
 <header id="hd">
   <div class="bar">
-    <div class="logo"><button class="logo-b" data-tab="home" title="Accueil"><span class="logo-mark" aria-hidden="true">HC</span><span class="logo-t">HC Toolkit</span></button><small class="logo-s">Hardcore Worlds · <button class="linkish" id="changelog" title="Nouveautés">v1.7.1</button></small></div>
+    <div class="logo"><button class="logo-b" data-tab="home" title="Accueil"><span class="logo-mark" aria-hidden="true">HC</span><span class="logo-t">HC Toolkit</span></button><small class="logo-s">Hardcore Worlds · <button class="linkish" id="changelog" title="Nouveautés">v1.8</button></small></div>
     <div class="search"><input id="q" type="search" placeholder="Rechercher un objet…   ( / )" autocomplete="off"><button class="btn kbtn" id="palBtn" title="Aller n'importe où (Ctrl+K)">⌘K</button></div>
     <div class="ctrl">
       <span class="status" id="status">Chargement…</span>
@@ -2065,6 +2065,7 @@ function setLive(sec){liveSec=+sec;store.set('liveSec',liveSec);clearInterval(li
 function favRows(){const ids=[...favs].filter(id=>MAP[id]);hcwWant(ids);wantSpark(ids);return ids.map(id=>base(id))}
 
 const CHANGELOG=`<div class="dh"><h2>Nouveautés</h2><button class="btn" id="close">Fermer</button></div>
+ <div class="box"><h3>v1.8 « Portefeuille » · 20 novembre 2026</h3><ul class="list"><li><span><b>💼 Mon portefeuille</b> (📈 Bourse) : note tes achats et ventes en 1 ligne (prix du moment pré-rempli) ou importe-les (plugin Flipping Utilities, ou ta banque via Data Export). Prix moyen, valeur, gain latent et réalisé (FIFO, taxe GE comptée sur le jeu normal), par perso, graphique avec tes achats ▲ et ventes ▼, journal. <b>Alertes silencieuses</b> quand un objet que tu as pompe (😴 +15 % / ⚖️ +8 % / 🔥 +4 %), chute, ou grimpe vite ; notification Windows en option.</span></li></ul></div>
  <div class="box"><h3>v1.7.1 · 20 novembre 2026</h3><ul class="list"><li><span><b>🔨 Ce que tu peux fabriquer avec</b> (dans la fiche de chaque objet) : toutes les recettes qui l'utilisent, classées par profit, avec les niveaux requis (🔒 si ton perso ne les a pas) et, pour chacune, la liste complète à acheter pour N fabrications (GE, PNJ ou fabriqué toi-même), coût, revente, profit, XP et temps.</span></li></ul></div>
  <div class="box"><h3>v1.7 « Arène & Futur » · 20 novembre 2026</h3><ul class="list">
   <li><span><b>🎯 Entraînement boss</b> (⚔️ Combat & butin, bêta) : <b>TzTok-Jad</b>, <b>les 3 Jads</b> de l'Inferno (écart réglable), <b>Corrupted Hunllef</b> (4 attaques par style, change d'arme après 6 coups) et <b>TzKal-Zuk</b> (reste derrière le bouclier, phase Jad). Horloge réelle (0,6 s), livre de prières à la vraie place, Q / W / E, records et historique. Aucun son.</span></li>
@@ -3538,6 +3539,168 @@ document.addEventListener('change',e=>{if(tab!=='futur'||e.target.id!=='futIn')r
 document.addEventListener('keydown',e=>{if(tab!=='futur'||e.target.id!=='futIn'||e.key!=='Enter')return;const id=BYNAME[(e.target.value||'').trim().toLowerCase()];if(id)futPick(id)});
 {const st=document.createElement('style');st.textContent=`.fut-ctl{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center}.fut-ctl input{min-width:220px}.fut-g{display:inline-flex;gap:4px;flex-wrap:wrap}
 .fut-head{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.fut-head h3{margin:0}.fut-head img{height:28px}`;document.head.appendChild(st)}
+/* ---------- 💼 Mon portefeuille : achats, ventes, gains, alertes « ça a pompé » ---------- */
+// Une transaction = {k, id, s:'b'|'s', q, p (prix unitaire), t (ms), who, w:'hc'|'osrs', src:'man'|'fu'|'bank', est (prix estimé)}
+// Positions par (monde, objet) en FIFO : on vend toujours les plus vieux achats d'abord.
+let pf=Object.assign({tx:[],mode:'bal',notif:false,who:'',fired:{},open:null,sort:'gain'},store.get('pf',{}));
+const pfSave=()=>store.set('pf',pf);
+const PF_MODES={safe:{n:'😴 Prudent',up:15,drop:-15,fast:10,min:100000},bal:{n:'⚖️ Équilibré',up:8,drop:-10,fast:6,min:25000},agg:{n:'🔥 Agressif',up:4,drop:-6,fast:3,min:5000}};
+// min = gp en jeu : sans lui, un objet à 3 gp qui passe à 4 gp ferait +33 % (vu avec les vrais prix sur les flèches et darts)
+const pfNet=(p,w)=>{if(p==null||w!=='osrs'||p<50)return p;return p-Math.min(Math.floor(p*0.02),5e6)}; // taxe GE 2 % : jeu normal seulement
+const pfUid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const pfWho=()=>pf.who||profile.name||'moi';
+function pfPersos(){return [...new Set([pfWho(),profile.name,...pf.tx.map(x=>x.who)].filter(Boolean))]}
+// prix actuels : vente instantanée = low (ce que paient les acheteurs), achat instantané = high
+const pfSellNow=id=>{const l=LAT[id];return l?(l.low||l.high||null):null};
+const pfBuyNow=id=>{const l=LAT[id];return l?(l.high||l.low||null):null};
+
+function pfBook(tx){ // FIFO -> positions ouvertes + gains réalisés
+  const P={};const L=tx.slice().sort((a,b)=>a.t-b.t||(a.s==='b'?-1:1));
+  for(const x of L){const key=x.w+'|'+x.id;const o=P[key]||(P[key]={w:x.w,id:x.id,lots:[],real:0,soldQ:0,over:0,sells:[]});
+    if(x.s==='b'){o.lots.push({q:x.q,p:x.p,t:x.t,who:x.who,est:!!x.est});continue}
+    let left=x.q,cost=0;while(left>0&&o.lots.length){const l=o.lots[0],k=Math.min(l.q,left);cost+=k*l.p;l.q-=k;left-=k;if(!l.q)o.lots.shift()}
+    const got=x.q-left;o.real+=got*pfNet(x.p,x.w)-cost;o.soldQ+=got;o.over+=left;o.sells.push(x)}
+  return Object.values(P).map(o=>{const q=o.lots.reduce((a,l)=>a+l.q,0),cost=o.lots.reduce((a,l)=>a+l.q*l.p,0);
+    return Object.assign(o,{q,cost,avg:q?cost/q:null,first:o.lots.length?o.lots[0].t:null,est:o.lots.some(l=>l.est),whos:[...new Set(o.lots.map(l=>l.who))]})})}
+function pfRows(){return pfBook(pf.tx).map(o=>{const here=o.w===WORLD,m=MAP[o.id];const now=here?pfSellNow(o.id):null;
+  const val=now!=null&&o.q?o.q*pfNet(now,o.w):null;const gain=val!=null?val-o.cost:null;
+  const d=here&&D24[o.id]||null;const avg24=d?(d.avgLowPrice||d.avgHighPrice||null):null;
+  return Object.assign(o,{m,here,now,val,gain,gpct:gain!=null&&o.cost?gain/o.cost*100:null,fast:now&&avg24?(now/avg24-1)*100:null})})}
+
+/* alertes : silencieuses (pas de son), bandeau + journal ; notification Windows seulement si cochée */
+function pfCheck(){if(!pf.tx.length)return;const M=PF_MODES[pf.mode]||PF_MODES.bal,now=Date.now();let changed=false;
+  const fire=(key,msg,id,step)=>{const f=pf.fired[key];if(f&&f.step>=step&&now-f.t<12*3600e3)return;pf.fired[key]={t:now,step};changed=true;
+    alertLog.unshift({t:now,msg:'💼 '+msg});alertLog=alertLog.slice(0,300);store.set('alertlog',alertLog);
+    const t=document.createElement('div');t.className='toast';t.innerHTML=`<b>💼 Portefeuille</b> ${esc(msg)}`;t.onclick=()=>{t.remove();tab='pf';pf.open=id;store.set('tab',tab);render()};
+    const box=$('#toasts');if(box){box.prepend(t);setTimeout(()=>t.remove(),30000)}
+    if(pf.notif)try{if('Notification' in window&&Notification.permission==='granted')new Notification('HC Toolkit · portefeuille',{body:msg,icon:icon(MAP[id]),silent:true})}catch(e){}};
+  for(const r of pfRows()){if(!r.here||!r.q||r.gpct==null||!r.m)continue;
+    if(r.gpct>=M.up&&r.gain>=M.min){const step=Math.floor(r.gpct/M.up);fire(r.w+r.id+'up',`${r.m.name} a pompé : ${futPct(r.gpct/100)} depuis ton achat (${gp(r.avg)} → ${gp(r.now)}), gain net ≈ ${gp(r.gain)}`,r.id,step)}
+    if(r.gpct<=M.drop&&-r.gain>=M.min){const step=Math.floor(-r.gpct/-M.drop);fire(r.w+r.id+'dn',`${r.m.name} chute : ${futPct(r.gpct/100)} depuis ton achat (${gp(r.avg)} → ${gp(r.now)})`,r.id,step)}
+    if(r.fast!=null&&r.fast>=M.fast&&r.q*r.now*(1-1/(1+r.fast/100))>=M.min){fire(r.w+r.id+'fast',`${r.m.name} grimpe vite : ${futPct(r.fast/100)} au-dessus de sa moyenne 24 h`,r.id,Math.floor(r.fast/M.fast))}}
+  if(changed)pfSave()}
+{const _ca=checkAlerts;checkAlerts=function(){_ca();try{pfCheck()}catch(e){}}}
+
+/* imports */
+function pfAddTx(x){pf.tx.push(Object.assign({k:pfUid(),w:WORLD,who:pfWho(),src:'man',t:Date.now()},x))}
+function pfTime(t){if(t==null)return null;if(typeof t==='number')return t<1e11?t*1000:t;if(typeof t==='string'){const v=Date.parse(t);return isNaN(v)?null:v}
+  if(typeof t==='object'&&t.seconds!=null)return t.seconds*1000+Math.round((t.nanos||0)/1e6);return null}
+// Flipping Utilities : .runelite\flipping\<pseudo>.json = {trades:[{id,name,h:{sO:[{b,id,cQIT,p,t,s,st,tSFO}]}}]}
+// (ancien trades.json : {pseudo:{trades:[…]}}). Une offre = un échange (déjà compressé par le plugin).
+function pfParseFU(txt,fname){let J;try{J=JSON.parse(txt)}catch(e){return null}const out=[];
+  const acc=(A,who)=>{(A&&A.trades||[]).forEach(it=>{const evs=it&&it.h&&it.h.sO||[];evs.forEach(o=>{const q=+o.cQIT||0,id=+(o.id||it.id),t=pfTime(o.t);if(!q||!id||!t||!(o.p>0))return;
+    out.push({id,s:o.b?'b':'s',q,p:+o.p,t,who,src:'fu',fk:[who,id,o.s,o.b?1:0].join('|'),fs:t-(+o.tSFO||0)*600})})})};
+  const stem=String(fname||'').replace(/\.json$/i,'');
+  if(J&&Array.isArray(J.trades))acc(J,stem);else if(J&&typeof J==='object')Object.entries(J).forEach(([k,v])=>{if(v&&Array.isArray(v.trades))acc(v,k)});
+  return out}
+function pfImportFU(list){let add=0,upd=0;const idx={};const same=x=>(idx[x.fk]||[]).find(i=>Math.abs(pf.tx[i].fs-x.fs)<180000); // même slot, début à ± 3 min = même échange
+  pf.tx.forEach((x,i)=>{if(x.fk)(idx[x.fk]=idx[x.fk]||[]).push(i)});
+  for(const x of list){if(stemSkip(x.who))continue;const i=same(x);
+    if(i!=null){const o=pf.tx[i];if(o.q!==x.q||o.p!==x.p){o.q=x.q;o.p=x.p;o.t=x.t;upd++}}
+    else{pf.tx.push(Object.assign({k:pfUid(),w:WORLD},x));(idx[x.fk]=idx[x.fk]||[]).push(pf.tx.length-1);add++}}
+  return {add,upd}}
+const stemSkip=w=>/^accountwide$/i.test(w||'');
+// Banque (Data Export container_bank.json ou Bank Memory) : quantités sans prix -> prix du moment, marqué « estimé »
+function pfParseBank(txt){const out={};const put=(id,q)=>{id=+id;q=+q;if(!id||!(q>0)||id===995||!MAP[id])return;out[id]=(out[id]||0)+q};
+  try{const walk=v=>{if(Array.isArray(v))v.forEach(walk);else if(v&&typeof v==='object'){const id=v.id??v.itemId??v.item_id;if(id!=null)put(id,v.quantity??v.qty??v.amount??1);else Object.values(v).forEach(walk)}};walk(JSON.parse(txt));return out}catch(e){}
+  const L=txt.split(/\r?\n/).map(l=>l.split(/\t|;|,/));const hd=(L[0]||[]).map(x=>x.toLowerCase());const ci=hd.findIndex(x=>/id/.test(x)),qi=hd.findIndex(x=>/quant|qty|amount|nombre/.test(x)),ni=hd.findIndex(x=>/name|nom/.test(x));
+  L.slice(ci>=0||ni>=0?1:0).forEach(r=>{const id=ci>=0?r[ci]:ni>=0?BYNAME[(r[ni]||'').trim().toLowerCase()]:/^\d+$/.test(r[0])?r[0]:null;put(id,qi>=0?r[qi]:r.length>2?r[2]:r[1])});return out}
+function pfImportBank(have,who){const held={};pfBook(pf.tx.filter(x=>x.w===WORLD&&x.who===who)).forEach(o=>held[o.id]=o.q);let add=0,less=0;
+  for(const [id,q] of Object.entries(have)){const d=q-(held[id]||0);if(d>0){const p=pfBuyNow(+id);pfAddTx({id:+id,s:'b',q:d,p:p||0,who,src:'bank',est:true});add++}else if(d<0)less++}
+  return {add,less}}
+
+/* graphique : prix du monde + tes achats (▲ vert) et ventes (▼ rouge) */
+let PFTS={};
+async function pfLoadTs(id){const k=WORLD+id;if(PFTS[k]&&Date.now()-PFTS[k].t<15*60e3)return PFTS[k].d;let d=[];
+  try{d=(await j(API+`timeseries?id=${id}&lookback=30d`)).data||[];const h=(await j(API+`timeseries?id=${id}&lookback=7d`)).data||[];const cut=h.length?h[0].timestamp:Infinity;d=d.filter(x=>x.timestamp<cut).concat(h)}catch(e){}
+  PFTS[k]={t:Date.now(),d};return d}
+function pfChart(id,d,tx){const pts=d.map(x=>[x.timestamp*1000,x.avgLowPrice&&x.avgHighPrice?(x.avgLowPrice+x.avgHighPrice)/2:(x.avgLowPrice||x.avgHighPrice)]).filter(p=>p[1]);
+  const mine=tx.filter(x=>x.id===id&&x.w===WORLD);if(!pts.length&&!mine.length)return '<p class="mut">Pas d\'historique de prix pour cet objet (N/A).</p>';
+  const now=Date.now(),t0=Math.min(...pts.map(p=>p[0]),...mine.map(x=>x.t),now-864e5),t1=now;const ys=pts.map(p=>p[1]).concat(mine.map(x=>x.p).filter(Boolean));
+  let lo=Math.min(...ys),hi=Math.max(...ys);const pad=(hi-lo||hi*.02||1)*.1;lo-=pad;hi+=pad;
+  const W=640,H=220,P={l:56,r:14,t:10,b:22},X=t=>P.l+(t-t0)/(t1-t0||1)*(W-P.l-P.r),Y=v=>P.t+(hi-v)/(hi-lo||1)*(H-P.t-P.b);
+  const grid=[0,.5,1].map(f=>{const v=lo+(hi-lo)*f;return `<line x1="${P.l}" x2="${W-P.r}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)"/><text x="${P.l-5}" y="${Y(v)+4}" text-anchor="end" font-size="11" fill="var(--muted)">${gp(v)}</text>`}).join('');
+  const line=pts.length?`<path d="${pts.map((p,k)=>(k?'L':'M')+X(p[0]).toFixed(1)+','+Y(p[1]).toFixed(1)).join('')}" fill="none" stroke="var(--fg)" stroke-width="1.5"/>`:'';
+  const mk=mine.filter(x=>x.p).map(x=>{const cx=X(x.t),cy=Y(x.p);return x.s==='b'?`<polygon points="${cx},${cy-6} ${cx-5},${cy+4} ${cx+5},${cy+4}" fill="var(--up)"${x.est?' opacity=".45"':''}><title>Achat ${gp(x.q)} × ${gp(x.p)} · ${new Date(x.t).toLocaleString('fr-BE')}${x.est?' (prix estimé)':''}</title></polygon>`
+    :`<polygon points="${cx},${cy+6} ${cx-5},${cy-4} ${cx+5},${cy-4}" fill="var(--down)"><title>Vente ${gp(x.q)} × ${gp(x.p)} · ${new Date(x.t).toLocaleString('fr-BE')}</title></polygon>`}).join('');
+  const fd=t=>new Date(t).toLocaleDateString('fr-BE',{day:'2-digit',month:'2-digit'});
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Prix et tes transactions">${grid}${line}${mk}<text x="${P.l}" y="${H-5}" font-size="11" fill="var(--muted)">${fd(t0)}</text><text x="${W-P.r}" y="${H-5}" font-size="11" fill="var(--muted)" text-anchor="end">maintenant</text></svg>
+   <p class="small mut">Ligne : prix (milieu achat/vente, ${WORLD_LABEL}) · ▲ vert : tes achats (pâle = prix estimé) · ▼ rouge : tes ventes. Survole un triangle pour le détail.</p>`}
+
+const pfAge=t=>{if(!t)return '–';const h=(Date.now()-t)/36e5;return h<1?Math.max(1,Math.round(h*60))+' min':h<48?Math.round(h)+' h':Math.round(h/24)+' j'};
+const pfDtIn=t=>{const d=new Date(t-new Date(t).getTimezoneOffset()*60000);return d.toISOString().slice(0,16)};
+function renderPf(){const host=hostBox();$('#filters').innerHTML='';$('#more').hidden=true;$('.tablewrap').hidden=true;$('#tbl thead').innerHTML='';$('#tbl tbody').innerHTML='';
+  $('#intro').textContent=`Tes achats et ventes, ce qu'ils valent maintenant et ce que tu as gagné. Les alertes « ça a pompé » sont silencieuses (bandeau + 🔔 Alertes) et se vérifient à chaque rafraîchissement des prix : garde l'outil ouvert.${WORLD==='osrs'?' Gains comptés après la taxe GE de 2 %.':' Pas de taxe GE sur les Hardcore Worlds.'}`;
+  const M=PF_MODES[pf.mode]||PF_MODES.bal,rows=pfRows(),open=rows.filter(r=>r.q>0),here=open.filter(r=>r.here),other=open.filter(r=>!r.here);
+  const inv=here.reduce((a,r)=>a+r.cost,0),val=here.reduce((a,r)=>a+(r.val||0),0),na=here.filter(r=>r.val==null).length,lat=here.reduce((a,r)=>a+(r.gain||0),0),real=rows.filter(r=>r.w===WORLD).reduce((a,r)=>a+r.real,0);
+  const wsel=pfWho(),ps=pfPersos();const dl=futDl();
+  let h=`<section class="box"><div class="pf-ctl"><span class="fut-g">${Object.entries(PF_MODES).map(([k,o])=>`<button class="btn${pf.mode===k?' primary':''}" data-pfm="${k}" title="Alerte à +${o.up} % depuis l'achat, ${o.drop} % en chute, +${o.fast} % au-dessus de la moyenne 24 h, dès ${gp(o.min)} gp en jeu">${o.n}</button>`).join('')}</span>
+    <label class="small"><input type="checkbox" id="pfNotif" ${pf.notif?'checked':''}> aussi en notification Windows <span class="mut">(muette ; demande l'autorisation)</span></label></div>
+    <p class="small mut">Alerte quand un objet que tu as monte de <b>+${M.up} %</b> depuis ton achat (puis à chaque palier de ${M.up} %), chute de <b>${M.drop} %</b>, ou grimpe de <b>+${M.fast} %</b> au-dessus de sa moyenne 24 h — seulement si au moins <b>${gp(M.min)} gp</b> sont en jeu (sinon les objets à quelques gp sonneraient sans arrêt).</p></section>
+   <section class="box"><h3>＋ Noter un achat ou une vente</h3><form id="pfForm" class="pf-form" autocomplete="off">
+    <select id="pfS"><option value="b">Achat</option><option value="s">Vente</option></select>
+    <input id="pfIt" list="pfDl" placeholder="Objet (ex. Runite ore)" required><datalist id="pfDl">${dl}</datalist>
+    <label>× <input id="pfQ" type="number" min="1" value="1" style="width:90px"></label>
+    <label>à <input id="pfP" type="number" min="0" placeholder="prix" style="width:110px"> gp</label>
+    <label>perso <input id="pfWho" list="pfWl" value="${esc(wsel)}" style="width:120px"></label><datalist id="pfWl">${ps.map(x=>`<option value="${esc(x)}">`).join('')}</datalist>
+    <input id="pfT" type="datetime-local" value="${pfDtIn(Date.now())}">
+    <button class="btn primary" type="submit">Noter ⏎</button></form><p class="small mut" id="pfHint">Le prix se remplit tout seul avec le prix du moment (achat instantané pour un achat, vente instantanée pour une vente) : corrige-le si tu as payé autre chose.</p>
+    <details class="pf-imp"><summary>📂 Importer automatiquement</summary>
+     <p><b>Flipping Utilities</b> (plugin RuneLite du Plugin Hub, il note tous tes échanges GE sur ton PC) : choisis les fichiers <code>&lt;pseudo&gt;.json</code> du dossier <code>%userprofile%\\.runelite\\flipping</code>. Seul ce que tu choisis est lu ; aucun identifiant n'y est stocké. Réimporter met à jour sans doublon. <input type="file" id="pfFU" accept=".json" multiple></p>
+     <p><b>Banque</b> (plugin Data Export : <code>container_bank.json</code>, ou Bank Memory) pour <b>${esc(wsel)}</b> : ajoute ce que tu as en plus du portefeuille, au prix du moment (marqué « estimé », pour suivre les hausses à partir d'aujourd'hui). <input type="file" id="pfBank" accept=".json,.tsv,.txt,.csv"></p>
+     <p class="small mut">Tout est importé dans le monde ouvert (${WORLD_LABEL}). Flipping Utilities ne dit pas si un échange était sur HC ou le jeu normal.</p><p id="pfImpMsg" class="small"></p></details></section>`;
+  h+=`<section class="box"><div class="kv"><div><span>Investi (en cours)</span><b>${gp(inv)}</b></div><div><span>Vaut maintenant</span><b>${gp(val)}${na?` <small class="mut">+ ${na} N/A</small>`:''}</b></div>
+    <div><span>Gain latent</span><b class="${lat>=0?'up':'down'}">${lat>=0?'+':''}${gp(lat)}</b></div><div><span>Gain réalisé (ventes)</span><b class="${real>=0?'up':'down'}">${real>=0?'+':''}${gp(real)}</b></div><div><span>Objets en cours</span><b>${here.length}</b></div></div>`;
+  const srt={gain:(a,b)=>(b.gpct??-1e9)-(a.gpct??-1e9),val:(a,b)=>(b.val||0)-(a.val||0),age:(a,b)=>(a.first||0)-(b.first||0)}[pf.sort]||(()=>0);
+  const L=here.slice().sort(srt).concat(other);
+  h+=open.length?`<div class="tablewrap"><table class="eqt pf-t"><thead><tr><th class="l">Objet</th><th>Qté</th><th data-pfsort="age" style="cursor:pointer">Acheté (moy.) ${pf.sort==='age'?'▾':''}</th><th>Maintenant</th><th data-pfsort="val" style="cursor:pointer">Valeur ${pf.sort==='val'?'▾':''}</th><th data-pfsort="gain" style="cursor:pointer">Gain net ${pf.sort==='gain'?'▾':''}</th><th>24 h</th><th>Depuis</th><th class="l">Perso</th></tr></thead><tbody>
+    ${L.map(r=>{const nm=r.m?r.m.name:'#'+r.id,flag=r.gpct!=null&&r.gpct>=M.up?' 🔔':r.gpct!=null&&r.gpct<=M.drop?' ⚠':'';
+      return `<tr data-pfid="${r.id}" data-pfw="${r.w}" class="${r.here?'':'mut'}" style="cursor:pointer"><td class="l">${r.m?`<img src="${icon(r.m)}" alt="">`:''}${esc(nm)}${r.est?' <span class="pill" title="Prix d\'achat estimé (import banque)">estimé</span>':''}${flag}</td><td>${gp(r.q)}</td><td>${gp(r.avg)}</td>
+       ${r.here?`<td>${r.now!=null?gp(r.now):'<span class="mut">N/A</span>'}</td><td>${r.val!=null?gp(r.val):'<span class="mut">N/A</span>'}</td><td class="${r.gain==null?'mut':r.gain>=0?'up':'down'}">${r.gain==null?'N/A':(r.gain>=0?'+':'')+gp(r.gain)+` <small>(${futPct(r.gpct/100)})</small>`}</td><td class="${r.fast==null?'mut':r.fast>=0?'up':'down'}">${r.fast==null?'N/A':futPct(r.fast/100)}</td>`
+        :`<td colspan="4" class="mut">N/A : ${r.w==='osrs'?'jeu normal':'Hardcore Worlds'} (change de monde pour le prix)</td>`}<td>${pfAge(r.first)}</td><td class="l small">${esc(r.whos.join(', '))}</td></tr>`}).join('')}</tbody></table></div>`
+    :'<p class="mut">Rien en cours. Note ton premier achat au-dessus, ou importe Flipping Utilities / ta banque.</p>';
+  h+='</section>';
+  if(pf.open!=null){const id=pf.open,m=MAP[id],r=rows.find(x=>x.id===id&&x.w===WORLD),mine=pf.tx.filter(x=>x.id===id).sort((a,b)=>b.t-a.t);
+    h+=`<section class="box" id="pfDet"><div class="fut-head">${m?`<img src="${icon(m)}" alt="">`:''}<h3>${esc(m?m.name:'#'+id)}</h3>${r&&r.q?`<span class="pill">${gp(r.q)} en cours · moy. ${gp(r.avg)}</span>`:''}${r&&r.real?`<span class="pill ${r.real>=0?'gold':'warn'}">réalisé ${r.real>=0?'+':''}${gp(r.real)}</span>`:''}
+      <button class="btn" data-pfa="sellall" ${r&&r.q?'':'disabled'}>✔ Tout vendu</button><button class="btn" data-pfa="fut">🔮 Le futur</button><button class="btn" data-pfa="close">✕</button></div>
+      <div id="pfChart">${PFTS[WORLD+id]?pfChart(id,PFTS[WORLD+id].d,pf.tx):'<p class="mut">Lecture de l\'historique…</p>'}</div>
+      <h3>🧾 Journal</h3><ul class="list">${mine.map(x=>`<li><span>${x.s==='b'?'<b class="up">Achat</b>':'<b class="down">Vente</b>'} ${gp(x.q)} × ${gp(x.p)} gp = ${gp(x.q*x.p)} · ${esc(x.who)}${x.w!==WORLD?' · <span class="mut">'+(x.w==='osrs'?'jeu normal':'HC')+'</span>':''}${x.est?' · <span class="mut">prix estimé</span>':''}${x.src==='fu'?' · <span class="mut">Flipping Utilities</span>':''}</span><span class="mut">${new Date(x.t).toLocaleString('fr-BE',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'})} <button class="linkish" data-pfdel="${x.k}" title="Supprimer cette ligne">🗑</button></span></li>`).join('')||'<li class="mut">Aucune transaction.</li>'}</ul></section>`;
+    if(!PFTS[WORLD+id])pfLoadTs(id).then(d=>{const c=$('#pfChart');if(tab==='pf'&&pf.open===id&&c)c.innerHTML=pfChart(id,d,pf.tx)})}
+  const byWho={};rows.filter(r=>r.here).forEach(r=>{r.lots.forEach(l=>{const o=byWho[l.who]||(byWho[l.who]={inv:0,val:0});o.inv+=l.q*l.p;if(r.now!=null)o.val+=l.q*pfNet(r.now,r.w)})});
+  if(Object.keys(byWho).length>1)h+=`<section class="box"><h3>👥 Par perso (en cours)</h3><div class="tablewrap"><table class="eqt"><thead><tr><th class="l">Perso</th><th>Investi</th><th>Vaut</th><th>Gain</th></tr></thead><tbody>${Object.entries(byWho).sort((a,b)=>(b[1].val-b[1].inv)-(a[1].val-a[1].inv)).map(([w,o])=>`<tr><td class="l">${esc(w)}</td><td>${gp(o.inv)}</td><td>${gp(o.val)}</td><td class="${o.val>=o.inv?'up':'down'}">${o.val>=o.inv?'+':''}${gp(o.val-o.inv)}</td></tr>`).join('')}</tbody></table></div></section>`;
+  host.innerHTML=h}
+function pfFillPrice(){const it=$('#pfIt'),p=$('#pfP');if(!it||!p)return;const id=BYNAME[(it.value||'').trim().toLowerCase()];if(!id)return;const v=$('#pfS').value==='b'?pfBuyNow(id):pfSellNow(id);
+  if(v!=null){p.value=v;p.dataset.auto='1'}const r=pfRows().find(x=>x.id===id&&x.here);$('#pfHint').innerHTML=v==null?'<span class="mut">Pas de prix pour cet objet (N/A) : tape ce que tu as payé.</span>':`Prix du moment : achat ${gp(pfBuyNow(id))} · vente ${gp(pfSellNow(id))}${r&&r.q?` · tu en as <b>${gp(r.q)}</b> (moy. ${gp(r.avg)})`:''}`;
+  if($('#pfS').value==='s'&&r&&r.q)$('#pfQ').value=r.q}
+VIEWS.pf={label:'Mon portefeuille 💼',custom:true,render:()=>renderPf()};
+MOVES.pf=['📝 Note tes achats (ou importe-les)','👀 Gain en direct','🔔 Alerte quand ça pompe → revends'];
+NEWTABS.add('pf');
+{const g=GROUPS.find(x=>x[0]==='ge');if(g&&!g[2].includes('pf'))g[2].push('pf')}
+document.addEventListener('submit',e=>{if(e.target.id!=='pfForm')return;e.preventDefault();const id=BYNAME[($('#pfIt').value||'').trim().toLowerCase()];
+  if(!id){$('#pfHint').innerHTML='<span class="down">Objet inconnu : choisis-le dans la liste.</span>';return}
+  const q=Math.max(1,Math.round(+$('#pfQ').value||0)),p=Math.max(0,+$('#pfP').value||0),t=Date.parse($('#pfT').value)||Date.now(),who=($('#pfWho').value||'').trim()||pfWho(),s=$('#pfS').value;
+  pf.who=who;pfAddTx({id,s,q,p,t,who});pfSave();pf.open=id;render();try{pfCheck()}catch(e){}});
+document.addEventListener('input',e=>{if(tab!=='pf')return;if(e.target.id==='pfIt')pfFillPrice();if(e.target.id==='pfP')delete e.target.dataset.auto});
+document.addEventListener('change',async e=>{if(tab!=='pf')return;const t=e.target;
+  if(t.id==='pfS')pfFillPrice();
+  if(t.id==='pfNotif'){pf.notif=t.checked;pfSave();if(t.checked&&'Notification' in window&&Notification.permission==='default')try{await Notification.requestPermission()}catch(_){}}
+  if(t.id==='pfWho'){pf.who=(t.value||'').trim();pfSave()}
+  if(t.id==='pfFU'&&t.files.length){let all=[],bad=0;for(const f of t.files){const L=pfParseFU(await f.text(),f.name);if(L)all=all.concat(L);else bad++}
+    const r=pfImportFU(all);pfSave();render();const m=$('#pfImpMsg');if(m)m.innerHTML=`✔ Flipping Utilities : ${r.add} échange(s) ajouté(s), ${r.upd} mis à jour${bad?`, ${bad} fichier(s) illisible(s)`:''}.`;$('.pf-imp')&&($('.pf-imp').open=true);try{pfCheck()}catch(_){}}
+  if(t.id==='pfBank'&&t.files.length){const have=pfParseBank(await t.files[0].text());const r=pfImportBank(have,pfWho());pfSave();render();
+    const m=$('#pfImpMsg');if(m)m.innerHTML=`✔ Banque de ${esc(pfWho())} : ${Object.keys(have).length} objets lus, ${r.add} ajouté(s) au prix du moment${r.less?`, ${r.less} objet(s) dont tu as moins en banque que dans le portefeuille (vendus ailleurs ? note la vente)`:''}.`;$('.pf-imp')&&($('.pf-imp').open=true)}});
+document.addEventListener('click',e=>{if(tab!=='pf')return;const t=e.target.closest('[data-pfm],[data-pfid],[data-pfa],[data-pfdel],[data-pfsort]');if(!t)return;
+  if(t.dataset.pfm){pf.mode=t.dataset.pfm;pf.fired={};pfSave();render();return}
+  if(t.dataset.pfsort){pf.sort=t.dataset.pfsort;pfSave();render();return}
+  if(t.dataset.pfdel){if(!confirmDel())return;pf.tx=pf.tx.filter(x=>x.k!==t.dataset.pfdel);pfSave();render();return}
+  if(t.dataset.pfa==='close'){pf.open=null;pfSave();render();return}
+  if(t.dataset.pfa==='fut'){futSt.id=pf.open;futSt.recent=[pf.open].concat(futSt.recent.filter(x=>x!==pf.open)).slice(0,12);futSave();tab='futur';store.set('tab',tab);render();return}
+  if(t.dataset.pfa==='sellall'){const r=pfRows().find(x=>x.id===pf.open&&x.w===WORLD);if(!r||!r.q)return;pfAddTx({id:r.id,s:'s',q:r.q,p:pfSellNow(r.id)||0});pfSave();render();return}
+  if(t.dataset.pfid){if(t.dataset.pfw!==WORLD){pf.open=+t.dataset.pfid;pfSave();render();return}pf.open=pf.open===+t.dataset.pfid?null:+t.dataset.pfid;pfSave();render();
+    setTimeout(()=>{const d=$('#pfDet');if(d)d.scrollIntoView({behavior:'smooth',block:'nearest'})},50)}});
+let pfDelArm=0;function confirmDel(){const n=Date.now();if(n-pfDelArm<4000){pfDelArm=0;return true}pfDelArm=n;showErr('Clique encore sur 🗑 pour confirmer la suppression.');return false}
+{const st=document.createElement('style');st.textContent=`.pf-ctl{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center}.pf-form{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.pf-form #pfIt{min-width:200px}
+.pf-t td img{height:20px;vertical-align:middle;margin-right:6px}.pf-imp{margin-top:10px}.pf-imp summary{cursor:pointer;font-weight:600}.pf-imp input[type=file]{display:block;margin-top:4px}`;document.head.appendChild(st)}
 
 /* ================= v1.7.1 🔨 Ce que tu peux fabriquer avec un objet (dans sa fiche) =================
    Toutes les recettes qui utilisent l'objet, sans en cacher aucune : profit par fabrication, gp/h, niveaux requis (🔒 si le perso chargé
