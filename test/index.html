@@ -4099,6 +4099,173 @@ document.addEventListener('click',e=>{if(tab!=='emp')return;const t=e.target.clo
   b.onclick=()=>{let n=0,tot=0;p.items.forEach(x=>{const q=x.Q|0;if(!q)return;const rev=empNpcRev(p.shop,x.id,q,x.fixed?0:x.per)??Math.round(q*x.first);empAddNpc({id:x.id,q,rev,shop:p.shop});n++;tot+=rev});
     b.textContent=`✔ ${n} objet(s) notés : ${gp(tot)} gp encaissés`;b.disabled=true}}}
 
+/* ================= 2.1 : banques Data Export, courbes dans Mon empire, 🎯 Pics répétés, menu en espaces ================= */
+/* ---------- 🏦 Banques et persos (plugin Data Export : .runelite\data-exports\<perso>_<type>_<date>.json) ---------- */
+let empBanks=store.get('empBanks',{}); // {perso:{w, bank:{t,items:{nom:q}}, skills:{t,lv:{Skill:niveau}}, quests:{t,qp,done}, diaries:{t,done,total}}}
+const empSaveBanks=()=>{try{store.set('empBanks',empBanks)}catch(e){}};
+function empParseDE(txt,fname){const m=String(fname||'').split(/[\\/]/).pop().match(/^(.+)_(bank|skills|quests|diaries)_(\d{4}-\d\d-\d\d)_(\d\d)-(\d\d)-(\d\d)\.json$/i);if(!m)return null;
+  let J;try{J=JSON.parse(txt)}catch(e){return null}const t=Date.parse(`${m[3]}T${m[4]}:${m[5]}:${m[6]}`)||Date.now();const who=m[1],kind=m[2].toLowerCase();
+  if(kind==='bank'){const items={};(J.bank||[]).forEach(x=>{if(x&&x.name&&x.quantity>0)items[x.name]=(items[x.name]||0)+x.quantity});return {who,kind,t,data:{t,items}}}
+  if(kind==='skills'){const lv={};Object.entries(J.skills||{}).forEach(([k,v])=>{lv[k]=v&&v.level||0});return {who,kind,t,data:{t,lv}}}
+  if(kind==='quests'){const q=J.quests||{};return {who,kind,t,data:{t,qp:q.questPoints||0,done:(q.completed||[]).length,list:q.completed||[]}}}
+  if(kind==='diaries'){let done=0,total=0;Object.values(J.diaries||{}).forEach(r=>Object.values(r||{}).forEach(v=>{total++;if(v)done++}));return {who,kind,t,data:{t,done,total}}}
+  return null}
+function empImportDE(list){let n=0;const who=new Set();for(const x of list){if(!x)continue;const P=empBanks[x.who]||(empBanks[x.who]={w:WORLD});const cur=P[x.kind];
+    if(!cur||x.t>=cur.t){P[x.kind]=x.data;P.w=WORLD;n++;who.add(x.who)}}empSaveBanks();return {n,who:who.size}}
+// meilleure sortie d'un objet : GE (vente instantanée, taxe déduite), alch (High alch - Nature rune), magasin (1re vente)
+function empExit(id){const m=MAP[id];if(!m)return null;const ge=pfSellNow(id)!=null?empNet(pfSellNow(id),WORLD):null;
+  const alch=m.highalch&&natPrice?m.highalch-natPrice:null;let shop=null,shopN=null;for(const s of empShopsFor(id).slice(0,3)){const p=empNpcPrice(s,id,0);if(p!=null&&(shop==null||p>shop)){shop=p;shopN=s}}
+  const opts=[['GE',ge],['alch',alch],['PNJ',shop]].filter(x=>x[1]!=null&&x[1]>0).sort((a,b)=>b[1]-a[1]);
+  return {ge,alch,shop,shopN,best:opts[0]||null}}
+function empBankCalc(){const rows=[],all={};let tot=0,coins=0;
+  for(const [who,P] of Object.entries(empBanks)){const B=P.bank;let val=0,na=0,c=0,n=0;
+    if(B)for(const [name,q] of Object.entries(B.items)){if(name==='Coins'){c+=q;continue}n++;const id=BYNAME[name.toLowerCase()];const p=id!=null?pfSellNow(id):null;
+      if(P.w!==WORLD||p==null){na++;continue}const v=p*q;val+=v;const a=all[id]||(all[id]={id,q:0,v:0,who:[]});a.q+=q;a.v+=v;a.who.push(who)}
+    const sk=P.skills&&P.skills.lv;const total=sk?Object.entries(sk).filter(([k])=>k!=='Overall').reduce((a,[,v])=>a+v,0):null;
+    rows.push({who,P,val,na,coins:c,n,total,qp:P.quests?P.quests.qp:null,diary:P.diaries?P.diaries.done:null,t:B?B.t:null,other:P.w!==WORLD});if(P.w===WORLD){tot+=val;coins+=c}}
+  return {rows:rows.sort((a,b)=>b.val-a.val),items:Object.values(all).sort((a,b)=>b.v-a.v),tot,coins}}
+function empBankHtml(){const C=empBankCalc();const known=new Set(Object.values(empTx).map(r=>r[1]).filter(w=>!/^#/.test(w)));
+  const miss=[...known].filter(w=>!empBanks[w]||!empBanks[w].bank);
+  let h=`<section class="box emp-bank"><h3><img class="emp-ico" src="${WIKI}images/Bank_icon.png" alt=""> Banques et persos</h3>
+   <p class="small mut">Plugin <b>Data Export</b> : ouvre la banque du perso, puis exporte depuis son panneau RuneLite. Ici : <label class="btn">🏦 Choisir le dossier <code>data-exports</code><input type="file" id="empDE" webkitdirectory directory multiple hidden></label> — le dernier export de chaque perso est gardé (banque, compétences, quêtes, journaux). Prix : ${WORLD_LABEL}, vente instantanée.</p>`;
+  if(!C.rows.length)return h+'<p class="mut">Aucune banque importée.</p></section>';
+  h+=`<div class="kv"><div><span>Valeur des banques</span><b class="up">${gp(C.tot)}</b></div><div><span>Pièces en banque</span><b>${gp(C.coins)}</b></div><div><span>Persos</span><b>${C.rows.filter(r=>r.P.bank).length}</b></div>${miss.length?`<div><span>Sans banque importée</span><b class="down">${miss.length}</b></div>`:''}</div>
+   ${miss.length?`<p class="small"><b class="down">Manque :</b> ${miss.map(esc).join(', ')} <span class="mut">(ouvre leur banque puis exporte)</span></p>`:''}
+   <div class="tablewrap"><table class="eqt"><thead><tr><th class="l">Perso</th><th>Banque</th><th>Pièces</th><th>N/A</th><th>Total niv.</th><th>QP</th><th>Journaux</th><th>Export</th></tr></thead><tbody>${C.rows.map(r=>`<tr data-empwho="${esc(r.who)}" style="cursor:pointer"><td class="l">${esc(r.who)}${r.other?` <span class="mut small">${empWL(r.P.w)}</span>`:''}</td><td>${r.P.bank?(r.other?'<span class="mut">N/A</span>':gpc(r.val)):'<span class="down">pas exportée</span>'}</td><td>${r.coins?gp(r.coins):'–'}</td><td>${r.na||'–'}</td><td>${r.total??'–'}</td><td>${r.qp??'–'}</td><td>${r.diary??'–'}</td><td class="small mut">${r.t?pfAge(r.t):'–'}</td></tr>`).join('')}</tbody></table></div>`;
+  const top=C.items.slice(0,emp.bankAll?400:15).map(a=>{const x=empExit(a.id)||{};const m=MAP[a.id];const d=D24[a.id]||{};const vol=(d.highPriceVolume||0)+(d.lowPriceVolume||0);
+    const gain=x.best&&x.ge!=null&&x.best[0]!=='GE'?(x.best[1]-x.ge)*a.q:0;return {a,x,m,vol,gain}});
+  h+=`<h3 class="wt">💰 Ce qui dort dans les banques, et où le sortir</h3><div class="tablewrap"><table class="eqt emp-t"><thead><tr><th class="l">Objet</th><th>Qté</th><th>Valeur GE</th><th>GE</th><th>Alch</th><th>PNJ (1er)</th><th>Meilleur</th><th>Gagné vs GE</th><th>Jours de volume</th><th class="l">Chez</th></tr></thead><tbody>${top.map(({a,x,m,vol,gain})=>`<tr data-id="${a.id}"><td class="l"><img src="${icon(m)}" alt="">${esc(m.name)}</td><td>${gp(a.q)}</td><td>${gp(a.v)}</td><td>${x.ge!=null?gp(x.ge):'N/A'}</td><td>${x.alch>0?gp(x.alch):'–'}</td><td>${x.shop!=null?`<span title="${esc(x.shopN||'')}">${gp(x.shop)}</span>`:'–'}</td><td>${x.best?`<b class="${x.best[0]==='GE'?'':'up'}">${x.best[0]}</b>`:'N/A'}</td><td>${gain>0?`<b class="up">+${gp(gain)}</b>`:'–'}</td><td>${vol?(a.q/vol<.1?'< 0,1':(a.q/vol).toFixed(1).replace('.',',')):'<span class="mut">N/A</span>'}</td><td class="l small">${esc(a.who.slice(0,3).join(', '))}${a.who.length>3?'…':''}</td></tr>`).join('')}</tbody></table></div>
+   <p class="small"><button class="linkish" data-empa="bankall">${emp.bankAll?'Afficher les 15 premiers':'Afficher tous les objets ('+C.items.length+')'}</button> · <span class="mut">« Jours de volume » = quantité ÷ échanges sur 24 h : au-dessus de 1, vends en plusieurs jours. Clique un objet pour sa fiche.</span></p>`;
+  if(emp.bankWho&&empBanks[emp.bankWho]){const P=empBanks[emp.bankWho];const sk=P.skills&&P.skills.lv;
+    h+=`<div class="emp-who"><h3 class="wt">👤 ${esc(emp.bankWho)} <button class="linkish" data-empa="bankwho">✕</button></h3>${sk?`<div class="emp-sk">${Object.entries(sk).filter(([k])=>k!=='Overall').map(([k,v])=>`<span title="${esc(k)}"><img src="${WIKI}images/${encodeURIComponent(k)}_icon.png" alt="" onerror="this.style.display='none'">${v}</span>`).join('')}</div>`:'<p class="mut small">Compétences : pas exportées.</p>'}
+     ${P.quests?`<p class="small">📜 ${P.quests.qp} QP · ${P.quests.done} quêtes finies${P.diaries?` · ${P.diaries.done}/${P.diaries.total} journaux`:''}</p>`:''}</div>`}
+  return h+'</section>'}
+
+/* ---------- courbe dans la fiche d'un objet de Mon empire : prix du monde + tes échanges Flipping Utilities ---------- */
+function empChart(id,d){const mine=Object.entries(empTx).filter(([,r])=>r[0]===WORLD&&r[2]===id).map(([k,r])=>({k,b:r[4],q:r[5],p:r[6],t:r[7],who:r[1],hid:empHidden(k,r)}))
+    .concat(emp.npc.filter(x=>x.w===WORLD&&x.id===id).map(x=>({npc:1,b:0,q:x.q,p:x.rev/x.q,t:x.t,who:x.who,shop:x.shop})));
+  const pts=d.map(x=>[x.timestamp*1000,x.avgLowPrice&&x.avgHighPrice?(x.avgLowPrice+x.avgHighPrice)/2:(x.avgLowPrice||x.avgHighPrice)]).filter(p=>p[1]);
+  const now=Date.now(),t0=Math.min(pts.length?pts[0][0]:now-30*864e5,now-30*864e5),show=mine.filter(x=>x.t>=t0);
+  if(!pts.length&&!show.length)return '<p class="mut small">Pas de courbe pour cet objet (N/A).</p>';
+  const ys=pts.map(p=>p[1]).concat(show.map(x=>x.p));let lo=Math.min(...ys),hi=Math.max(...ys);const pad=(hi-lo||hi*.02||1)*.1;lo=Math.max(0,lo-pad);hi+=pad;
+  const W=680,H=230,P={l:58,r:12,t:10,b:22},X=t=>P.l+(t-t0)/(now-t0||1)*(W-P.l-P.r),Y=v=>P.t+(hi-v)/(hi-lo||1)*(H-P.t-P.b);
+  const grid=[0,.5,1].map(f=>{const v=lo+(hi-lo)*f;return `<line x1="${P.l}" x2="${W-P.r}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)"/><text x="${P.l-5}" y="${Y(v)+4}" text-anchor="end" font-size="11" fill="var(--muted)">${gp(v)}</text>`}).join('');
+  const line=pts.length?`<path d="${pts.map((p,k)=>(k?'L':'M')+X(p[0]).toFixed(1)+','+Y(p[1]).toFixed(1)).join('')}" fill="none" stroke="var(--fg)" stroke-width="1.4"/>`:'';
+  const mk=show.map(x=>{const cx=X(x.t).toFixed(1),cy=Y(x.p).toFixed(1),op=x.hid?' opacity=".3"':'';const tt=`<title>${x.npc?'Vente PNJ':x.b?'Achat':'Vente'} ${gp(x.q)} × ${gp(x.p)} · ${esc(x.who)}${x.shop?' · '+esc(x.shop):''} · ${new Date(x.t).toLocaleString('fr-BE')}${x.hid?' · 🧪 masqué':''}</title>`;
+    return x.npc?`<rect x="${cx-4}" y="${cy-4}" width="8" height="8" fill="var(--gold)"${op}>${tt}</rect>`:x.b?`<polygon points="${cx},${cy-6} ${cx-5},${cy+4} ${+cx+5},${cy+4}" fill="var(--up)"${op}>${tt}</polygon>`:`<polygon points="${cx},${+cy+6} ${cx-5},${cy-4} ${+cx+5},${cy-4}" fill="var(--down)"${op}>${tt}</polygon>`}).join('');
+  const fd=t=>new Date(t).toLocaleDateString('fr-BE',{day:'2-digit',month:'2-digit'});
+  const off=show.filter(x=>!x.npc&&d.length).map(x=>{let best=null;for(const q of d){if(best==null||Math.abs(q.timestamp*1000-x.t)<Math.abs(best.timestamp*1000-x.t))best=q}if(!best||Math.abs(best.timestamp*1000-x.t)>12*36e5)return null;const lo2=best.avgLowPrice||best.avgHighPrice,hi2=best.avgHighPrice||best.avgLowPrice;return x.p<lo2?(lo2-x.p)/lo2:x.p>hi2?(x.p-hi2)/hi2:0}).filter(v=>v!=null);
+  const med=off.length?off.sort((a,b)=>a-b)[Math.floor(off.length/2)]:null;
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Prix et tes échanges">${grid}${line}${mk}<text x="${P.l}" y="${H-5}" font-size="11" fill="var(--muted)">${fd(t0)}</text><text x="${W-P.r}" y="${H-5}" font-size="11" fill="var(--muted)" text-anchor="end">maintenant</text></svg>
+   <p class="small mut">30 jours · ${WORLD_LABEL} · ▲ achat · ▼ vente GE · ■ vente PNJ · pâle = 🧪 masqué${med!=null?` · tes prix sont à ${(med*100).toFixed(1).replace('.',',')} % de la fourchette achat/vente de l'heure en médiane (${off.length} échanges) : ${med<.08?'cohérent avec le plugin ✔':'écart important, vérifie le monde ou un test de marché'}`:''}</p>`}
+
+/* ---------- 🎯 Pics répétés : ⭐ Must / 👀 Watch / 🧪 Oddities ---------- */
+let pk=Object.assign({f:'all',mine:false,res:null,at:0},store.get('pk',{}));const pkSave=()=>store.set('pk',{f:pk.f,mine:pk.mine});
+const PKTS={};let pkBusy=false;
+function pkAnalyse(id,d){const H=d.filter(x=>x.avgHighPrice).map(x=>({t:x.timestamp*1000,p:x.avgHighPrice,v:x.highPriceVolume||0})),L=d.filter(x=>x.avgLowPrice).map(x=>x.avgLowPrice).sort((a,b)=>a-b);
+  if(H.length<24||L.length<24)return null;const mids=d.map(x=>x.avgHighPrice&&x.avgLowPrice?(x.avgHighPrice+x.avgLowPrice)/2:(x.avgHighPrice||x.avgLowPrice)).filter(Boolean).sort((a,b)=>a-b);
+  const med=mids[Math.floor(mids.length/2)];const ep=[];let cur=null;
+  for(const x of H){if(x.p>=med*1.04){if(cur&&x.t-cur.end<=3*36e5){cur.end=x.t;if(x.p>cur.p)cur.p=x.p;cur.v+=x.v}else{cur={start:x.t,end:x.t,p:x.p,v:x.v};ep.push(cur)}}}
+  if(!ep.length)return null;const peaks=ep.map(e=>e.p).sort((a,b)=>a-b);const lvl=peaks[Math.floor(peaks.length/2)];
+  const touch=ep.filter(e=>e.p>=lvl*.97);const buy=L[Math.floor(L.length*.25)],sell=Math.round(lvl*.98);
+  const net=empNet(sell,WORLD),unit=net-buy,pct=buy?unit/buy*100:0;const m=MAP[id]||{};const d24=D24[id]||{};const vol=(d24.highPriceVolume||0)+(d24.lowPriceVolume||0);
+  const qty=Math.max(0,Math.min(m.limit||Infinity,Math.floor(vol/6/4)));const pot=unit>0?unit*qty:0;const last=Math.max(...touch.map(e=>e.end));
+  const big=Math.max(...peaks)/med-1,thin=touch.reduce((a,e)=>a+e.v,0)<=Math.max(3,touch.length*2);
+  let cls=null;if(touch.length>=3&&pct>=3&&unit>=5&&vol>=100&&pot>=20000&&Date.now()-last<=48*36e5&&!thin)cls='must';
+  else if(touch.length>=2&&pct>=1.5&&unit>0)cls='watch';else if(big>=.1)cls='odd';
+  if(!cls)return null;return {id,cls,med,lvl,buy,sell,unit,pct,touches:touch.length,ep:ep.length,last,vol,qty,pot,big,thin,d}}
+function pkSpark(r){const d=r.d.filter(x=>x.avgHighPrice||x.avgLowPrice);if(!d.length)return '';const W=150,H=36,t0=d[0].timestamp,t1=d[d.length-1].timestamp;
+  const ys=d.flatMap(x=>[x.avgHighPrice,x.avgLowPrice]).filter(Boolean).concat([r.buy,r.lvl]);const lo=Math.min(...ys),hi=Math.max(...ys);const X=t=>(t-t0)/(t1-t0||1)*W,Y=v=>H-2-(v-lo)/(hi-lo||1)*(H-4);
+  const path=k=>d.filter(x=>x[k]).map((x,i)=>(i?'L':'M')+X(x.timestamp).toFixed(1)+','+Y(x[k]).toFixed(1)).join('');
+  return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" class="pk-sp"><path d="${path('avgLowPrice')}" fill="none" stroke="#7fa0c0" stroke-width="1"/><path d="${path('avgHighPrice')}" fill="none" stroke="var(--fg)" stroke-width="1"/>
+   <line x1="0" x2="${W}" y1="${Y(r.lvl)}" y2="${Y(r.lvl)}" stroke="var(--gold)" stroke-dasharray="3 2"/><line x1="0" x2="${W}" y1="${Y(r.buy)}" y2="${Y(r.buy)}" stroke="var(--up)" stroke-dasharray="3 2"/></svg>`}
+function pkCands(){const s=new Set();const gpv=Object.keys(D24).map(Number).filter(id=>MAP[id]).map(id=>{const d=D24[id];return [id,((d.avgHighPrice||0)*(d.highPriceVolume||0))+((d.avgLowPrice||0)*(d.lowPriceVolume||0))]}).sort((a,b)=>b[1]-a[1]).slice(0,90);
+  gpv.forEach(x=>s.add(x[0]));[...favs].forEach(id=>MAP[id]&&s.add(+id));const now=Date.now();
+  Object.values(empTx).filter(r=>r[0]===WORLD&&now-r[7]<30*864e5).forEach(r=>MAP[r[2]]&&s.add(r[2]));return [...s].slice(0,160)}
+async function pkScan(){if(pkBusy)return;pkBusy=true;const ids=pkCands();let done=0;const out=[];const st=$('#pkSt');
+  for(let i=0;i<ids.length;i+=6){await Promise.all(ids.slice(i,i+6).map(async id=>{let d=PKTS[id]&&Date.now()-PKTS[id].t<30*60e3?PKTS[id].d:null;
+      if(!d){try{d=(await j(API+`timeseries?id=${id}&lookback=7d`)).data||[]}catch(e){d=[]}PKTS[id]={t:Date.now(),d}}const r=pkAnalyse(id,d);if(r)out.push(r);done++}));
+    const s=$('#pkSt');if(s&&tab==='peaks')s.textContent=`Analyse… ${done}/${ids.length}`}
+  pk.res=out;pk.at=Date.now();pk.n=ids.length;pkBusy=false;if(tab==='peaks')render()}
+function renderPeaks(){const host=hostBox();$('#filters').innerHTML='';$('#more').hidden=true;$('.tablewrap').hidden=true;$('#tbl thead').innerHTML='';$('#tbl tbody').innerHTML='';
+  $('#intro').textContent='Objets dont le prix vient taper plusieurs fois le même sommet sur 7 jours : place une offre d\'achat basse et une offre de vente juste sous le sommet, et laisse le marché venir à toi. Les « oddities » (pics isolés, marchés très minces) sont gardées : c\'est bizarre, mais parfois ça vaut la peine de se placer entre les deux.';
+  const R=pk.res||[];const mine=new Set(Object.values(empTx).filter(r=>r[0]===WORLD).map(r=>r[2]));
+  const L=R.filter(r=>(pk.f==='all'||r.cls===pk.f)&&(!pk.mine||mine.has(r.id))).sort((a,b)=>({must:0,watch:1,odd:2}[a.cls]-{must:0,watch:1,odd:2}[b.cls])||b.pot-a.pot||b.pct-a.pct);
+  const cnt=k=>R.filter(r=>r.cls===k).length;const B={must:'⭐ Must',watch:'👀 Watch',odd:'🧪 Oddity'};
+  let h=`<section class="box"><div class="pf-ctl"><span class="fut-g">${[['all','Tout ('+R.length+')'],['must','⭐ Must ('+cnt('must')+')'],['watch','👀 Watch ('+cnt('watch')+')'],['odd','🧪 Oddities ('+cnt('odd')+')']].map(([k,t])=>`<button class="btn${pk.f===k?' primary':''}" data-pkf="${k}">${t}</button>`).join('')}</span>
+    <label class="small"><input type="checkbox" id="pkMine" ${pk.mine?'checked':''}> seulement ce que j'ai déjà échangé</label>
+    <button class="btn" data-pka="scan" ${pkBusy?'disabled':''}>⟳ Relancer l'analyse</button> <span id="pkSt" class="small mut">${pkBusy?'Analyse…':pk.at?`${pk.n} objets analysés il y a ${pfAge(pk.at)} · ${WORLD_LABEL}`:''}</span></div>
+    <p class="small mut"><b>⭐ Must</b> : sommet touché 3 fois ou plus, dernier contact < 48 h, ≥ 3 % net après taxe, volume suffisant. <b>👀 Watch</b> : 2 contacts ou marge plus faible. <b>🧪 Oddity</b> : pic isolé d'au moins +10 % ou marché très mince. Achat = prix bas atteint 25 % du temps ; vente = 98 % du sommet. Potentiel = gain × quantité réaliste sur 4 h (limite GE et ¼ du volume).</p></section>`;
+  if(!pk.res)h+=`<section class="box"><p class="mut">${pkBusy?'Analyse des séries horaires (7 jours)…':'Clique « Relancer l\'analyse ».'}</p></section>`;
+  else h+=`<section class="box">${L.length?`<div class="tablewrap"><table class="eqt pk-t"><thead><tr><th class="l">Objet</th><th>Classe</th><th>7 jours (blanc : vente, bleu : achat ; ─ ─ sommet / achat)</th><th>Contacts</th><th>Dernier</th><th>Achète ≤</th><th>Vends ≥</th><th>Gain net</th><th>Vol. 24 h</th><th>Potentiel / 4 h</th></tr></thead><tbody>
+     ${L.slice(0,120).map(r=>{const m=MAP[r.id];return `<tr data-id="${r.id}" class="pk-${r.cls}"><td class="l"><img src="${icon(m)}" alt="">${esc(m.name)}${mine.has(r.id)?' <span class="pill" title="Tu en as déjà échangé">moi</span>':''}</td><td><span class="pk-b pk-${r.cls}">${B[r.cls]}</span></td><td>${pkSpark(r)}</td>
+       <td>${r.touches}${r.ep>r.touches?`<small class="mut">/${r.ep}</small>`:''}</td><td>${pfAge(r.last)}</td><td>${gp(r.buy)}</td><td>${gp(r.sell)}</td><td class="${r.unit>0?'up':'down'}">${r.unit>0?'+':''}${gp(r.unit)} <small>(${r.pct.toFixed(1).replace('.',',')} %)</small></td><td>${r.vol?gp(r.vol):'<span class="mut">N/A</span>'}${r.thin?' <span class="pill warn">mince</span>':''}</td><td>${r.pot?gp(r.pot):'–'}</td></tr>`}).join('')}</tbody></table></div>`:'<p class="mut">Rien dans ce classement pour l\'instant (marché jeune : relance plus tard).</p>'}</section>`;
+  host.innerHTML=h;if(!pk.res&&!pkBusy)pkScan()}
+VIEWS.peaks={label:'Pics répétés 🎯',custom:true,render:()=>renderPeaks()};
+MOVES.peaks=['🎯 Repère un sommet touché plusieurs fois','📈 Offre d\'achat basse + offre de vente sous le sommet','⏳ Laisse le marché venir'];
+NEWTABS.add('peaks');
+document.addEventListener('click',e=>{if(tab!=='peaks')return;const t=e.target.closest('[data-pkf],[data-pka]');if(!t)return;
+  if(t.dataset.pkf){pk.f=t.dataset.pkf;pkSave();render();return}if(t.dataset.pka==='scan'){pk.res=pk.res||null;pkScan();render()}});
+document.addEventListener('change',e=>{if(tab==='peaks'&&e.target.id==='pkMine'){pk.mine=e.target.checked;pkSave();render()}});
+
+/* Mon empire : import Data Export, persos, courbe de la fiche */
+document.addEventListener('change',async e=>{if(tab!=='emp'||e.target.id!=='empDE'||!e.target.files.length)return;const L=[];for(const f of e.target.files){if(/\.json$/i.test(f.name))L.push(empParseDE(await f.text(),f.name))}
+  const r=empImportDE(L.filter(Boolean));render();const m=$('#empMsg');if(m)m.innerHTML=`✔ Data Export : ${r.n} export(s) retenu(s) pour ${r.who} perso(s) (le plus récent de chacun).`});
+document.addEventListener('click',e=>{if(tab!=='emp')return;const t=e.target.closest('[data-empwho],[data-empa="bankall"],[data-empa="bankwho"]');if(!t)return;
+  if(t.dataset.empwho){emp.bankWho=t.dataset.empwho;empSave();render();return}if(t.dataset.empa==='bankall'){emp.bankAll=!emp.bankAll;empSave();render();return}
+  if(t.dataset.empa==='bankwho'){emp.bankWho=null;empSave();render()}});
+{const _r=renderEmp;renderEmp=function(){_r();const host=$('#alertsHost');if(!host)return;
+  const anchor=host.querySelector('.emp-f');if(anchor&&!host.querySelector('.emp-bank'))anchor.insertAdjacentHTML('afterend',empBankHtml());
+  const det=$('#empDet');if(det&&emp.open&&!det.querySelector('#empChart')){const {id,w}=emp.open;const head=det.querySelector('.fut-head');
+    head.insertAdjacentHTML('afterend',w===WORLD?'<div id="empChart"><p class="mut small">Lecture de la courbe…</p></div>':`<p class="small mut">Courbe : ouvre le Toolkit sur ${w==='osrs'?'OSRS normal':'Hardcore'} pour la voir.</p>`);
+    if(w===WORLD)pfLoadTs(+id).then(d=>{const c=$('#empChart');if(c&&tab==='emp'&&emp.open&&+emp.open.id===+id)c.innerHTML=empChart(+id,d)})}}}
+if(VIEWS.emp)VIEWS.emp.render=()=>renderEmp();
+
+/* ---------- menu de gauche en espaces : un seul ouvert à la fois, icônes du jeu ---------- */
+const SPACES=[['home','Accueil','Coins_10000.png',['home']],
+  ['hv','Hôtel des ventes','Grand_Exchange_icon.png',['emp','pf','flips','peaks','big','hits','futur','favs','instant','night','advice','all']],
+  ['npc','PNJ & magasins','General_store_icon.png',['tour','packs','resell','epic','ward','sticks','runes','shops','sets','dir']],
+  ['make','Transformer','High_Level_Alchemy.png',['alch','craft','offcuts','ship']],
+  ['quest','Quêtes & guides','Quest_point_icon.png',['guides']],
+  ['skill','Métiers & XP','Stats_icon.png',['prog']],
+  ['combat','Combat & butin','Combat_icon.png',['equip','clues','boss']],
+  ['use','Utiles','Lumbridge_Home_Teleport.png',['tele','cons','cross','transfer']],
+  ['cfg','Alertes & réglages','Settings.png',['alerts','atelier']]];
+const TAB_ICO={emp:'Bank_icon.png',pf:'Old_school_bond.png',peaks:'Watch.png',guides:'Quest_point_icon.png',prog:'Skills_icon.png',equip:'Attack_icon.png',clues:'Clue_scroll_(elite).png',boss:'Prayer_icon.png',tele:'Lumbridge_Home_Teleport.png',alch:'High_Level_Alchemy.png',craft:'Crafting_icon.png',ship:'Sailing_icon.png',alerts:'Watch.png',atelier:'Hammer.png',tour:'General_store_icon.png',flips:'Grand_Exchange_icon.png',futur:'Achievement_Diaries_icon.png',packs:'Nature_rune.png',offcuts:'Knife.png',cons:'Hitpoints_icon.png',home:'Coins_10000.png'};
+{const placed=new Set(SPACES.flatMap(s=>s[3]));const extra=Object.keys(VIEWS).filter(k=>!placed.has(k));if(extra.length)SPACES[SPACES.length-1][3].push(...extra);
+  GROUPS.length=0;SPACES.forEach(([k,l,,tabs])=>GROUPS.push([k,l,tabs]))}
+let railAll=store.get('railAll',false);
+renderTabs=function(){const g=groupOf(tab);lastInGroup[g]=tab;const cnt=k=>k==='favs'?favs.size:k==='alerts'?rules.length:null;const ico=f=>f?`<img class="ri-ico" src="${WIKI}images/${f}" alt="" loading="lazy">`:'';
+  $('#rail').innerHTML=SPACES.map(([k,l,ic,sub0])=>{const sub=sub0.filter(t=>VIEWS[t]&&!modHidden(t));if(!sub.length)return '';const open=railAll||k===g;
+    if(sub.length===1){const t=sub[0];return `<div class="rg"><button class="ri ri-solo" role="tab" data-tab="${t}" aria-selected="${t===tab}">${ico(ic)}<span>${esc(l)}</span>${cnt(t)!=null?`<span class="n">${cnt(t)}</span>`:''}</button></div>`}
+    return `<div class="rg${open?' open':''}"><button class="rgh" data-group="${k}" aria-expanded="${open}">${ico(ic)}<span>${esc(l)}</span><span class="rg-c">${open?'▾':sub.length}</span></button>${open?`<div class="rg-l">${sub.map(t=>{const v=VIEWS[t],n=cnt(t);
+      return `<button class="ri${NEWTABS.has(t)&&n==null?' new':''}" role="tab" data-tab="${t}" aria-selected="${t===tab}">${ico(TAB_ICO[t])}<span>${esc(v.label)}</span>${n!=null?`<span class="n">${n}</span>`:''}</button>`}).join('')}</div>`:''}</div>`}).join('')+
+    `<div class="rail-foot"><button class="linkish" id="railAll">${railAll?'▴ Replier les espaces':'▾ Tout déplier'}</button><br>Ctrl+K : aller n'importe où<br>/ : chercher un objet</div>`;
+  const cur=$('#rail [aria-selected=true]');if(cur&&cur.scrollIntoView&&document.body.classList.contains('compact'))cur.scrollIntoView({block:'nearest',inline:'nearest'});renderMove()};
+document.addEventListener('click',e=>{if(e.target.id==='railAll'){railAll=!railAll;store.set('railAll',railAll);renderTabs()}});
+
+/* ---------- reskin : panneaux façon interface du jeu (pierre, bordures doubles, onglets) ---------- */
+{const st=document.createElement('style');st.textContent=`
+.rail{background:repeating-linear-gradient(0deg,rgba(0,0,0,.05) 0 2px,transparent 2px 4px),linear-gradient(90deg,#3b3226,#2e271d);padding:8px 6px 16px}
+.rg{margin-bottom:4px;border:2px solid #1c1812;border-radius:3px;background:linear-gradient(#4a3f31,#3e3529);box-shadow:inset 1px 1px 0 #6b5b45,inset -1px -1px 0 #2a2319}
+.rg.open{background:#352d22}
+.rgh,.ri-solo{display:flex;align-items:center;gap:8px;width:100%;padding:7px 8px;border:0;background:none;font:600 14px var(--f-display);letter-spacing:.01em;text-transform:none;color:var(--gold);text-shadow:1px 1px 0 #000;cursor:pointer;text-align:left}
+.rgh:hover,.ri-solo:hover{color:var(--yel);background:rgba(255,255,255,.04)}
+.rg.open>.rgh{color:var(--yel);border-bottom:2px solid #1c1812;background:linear-gradient(#5a4a37,#45392b)}
+.rg-c{margin-left:auto;font:600 11px var(--f-mono);color:var(--muted);text-shadow:none}
+.rg-l{padding:3px 4px 5px}
+.ri{gap:7px;font-size:13.5px;padding:5px 7px}
+.ri-ico{width:20px;height:20px;object-fit:contain;image-rendering:pixelated;flex:none;filter:drop-shadow(1px 1px 0 #000)}
+.ri-solo[aria-selected=true]{background:linear-gradient(#94351f,var(--sel));color:var(--yel)}
+.box{background:linear-gradient(#433929,#3a3125);border:3px solid #1c1812;box-shadow:inset 0 0 0 1px #6b5b45,inset 0 0 0 3px #2e271d}
+.box h3{display:flex;align-items:center;gap:7px}
+.emp-ico{width:18px;height:18px;image-rendering:pixelated}
+.emp-sk{display:grid;grid-template-columns:repeat(auto-fill,minmax(62px,1fr));gap:4px;margin:6px 0}.emp-sk span{display:flex;align-items:center;gap:5px;padding:3px 6px;background:#2e271d;border:1px solid #1c1812;border-radius:2px;font:600 14px var(--f-display);color:var(--yel);text-shadow:1px 1px 0 #000}.emp-sk img{width:18px;height:18px;image-rendering:pixelated}
+.pk-t img{height:20px;vertical-align:middle;margin-right:4px}.pk-sp{display:block}
+.pk-b{display:inline-block;padding:1px 6px;border-radius:2px;font:600 12px var(--f-display);border:1px solid #1c1812;white-space:nowrap}
+.pk-b.pk-must{background:#5a4a10;color:var(--yel)}.pk-b.pk-watch{background:#23405a;color:#cfe6ff}.pk-b.pk-odd{background:#4a2a4a;color:#f0c8ff}
+tr.pk-must td:first-child{box-shadow:inset 3px 0 0 var(--yel)}tr.pk-odd td:first-child{box-shadow:inset 3px 0 0 #c070d0}`;document.head.appendChild(st)}
+
 applyCompact();if(WORLD==='osrs')document.body.classList.add('osrs');
 {const ls=$('.logo-s');if(ls)ls.firstChild.textContent=(WORLD==='osrs'?'OSRS normal (taxe 2 %)':'Hardcore Worlds')+' · ';}
 document.title=WORLD==='osrs'?'HC Toolkit · OSRS':'HC Toolkit';
