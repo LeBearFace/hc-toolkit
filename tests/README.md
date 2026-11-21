@@ -10,3 +10,4 @@ Les vrais prix se testent dans le navigateur intégré sur /test/ (le conteneur 
 `node tests/boss.js $PWD/test/index.html` : 🎯 simulateurs de boss (ticks, fenêtre de prière, Jad, 3 Jads, Hunllef, Zuk, records, clavier, 😴 AFK, ?afk=1, 560 px).
 `node tests/futur.js $PWD/test/index.html` : 🔮 Le futur avec des séries fictives (marche au hasard, cycle horaire, tendance, écart HC/normal plafonné, trous, 7 jours, scanner, 560 px).
 `node tests/portfolio.js $PWD/test/index.html` : 💼 Mon portefeuille (saisie avec prix pré-rempli, FIFO, taxe GE, import Flipping Utilities au format Gson réel, import banque, alertes silencieuses et seuil en gp, graphique, 2 clics pour supprimer, autre monde en N/A, 560 px).
+`node tests/empire.js $PWD/test/index.html [dossier flipping-utilities]` : 🏦 Mon empire (import du dossier, FIFO multi-persos, tests de marché masqués, ventes PNJ, chronos, « Pack vendu » de la Vitrine, 560 px ; avec un vrai dossier : totaux et sauvegarde).

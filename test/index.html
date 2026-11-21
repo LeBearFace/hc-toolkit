@@ -3892,6 +3892,213 @@ document.addEventListener('change',e=>{if(e.target.id==='usesN'){usesN=Math.max(
 
 /* v1.0 : démarrage du portail */
 try{const qp=new URLSearchParams(location.search);if(qp.get('panel')==='1')store.set('compact',true);if(qp.get('panel')==='0')store.set('compact',false);if(qp.get('world')&&qp.get('world')!==WORLD&&/^(hc|osrs)$/.test(qp.get('world'))){localStorage.setItem('hcx_world',JSON.stringify(qp.get('world')));location.replace(location.pathname+(qp.get('panel')?'?panel='+qp.get('panel'):''))}}catch(e){}
+/* ---------- 🏦 Mon empire (2.0) : tout l'historique GE + ventes PNJ + chronos ---------- */
+// Échange = [w 'hc'|'osrs', who, id, name, b 1 achat / 0 vente, q, p prix unitaire, t ms]. Rangé par uuid (Flipping Utilities), jamais effacé.
+// Ventes PNJ = {k,w,who,id,q,rev (total gp),shop,t}. Chronos = {k,name,who,acc,on (début en cours)}, sessions = {k,name,who,a,b,dur}.
+let empTx=store.get('empTx',{});
+let emp=Object.assign({npc:[],chr:[],ses:[],marks:{},rules:{on:false,min:1000,one:false,items:[]},f:{w:'all',per:'30',who:'',src:''},open:null,imp:null,who:''},store.get('emp',{}));
+const empSave=()=>store.set('emp',emp);
+const empSaveTx=()=>{try{store.set('empTx',empTx);return true}catch(e){return false}};
+const empUid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const empNet=(p,w)=>w==='osrs'&&p>=50?p-Math.min(Math.floor(p*0.02),5e6):p; // taxe GE 2 % : jeu normal seulement
+const empName=(id,n)=>MAP[id]?MAP[id].name:(n||'#'+id);
+const EMP_SRC={gws:{n:'🦈 Great white shark',items:['Broken dragon hook','Dragon metal sheet','Dragon keel parts','Large dragon keel parts','Dragon cannonball','Fremennik salvage','Dragon med helm','Dragon longsword','Crystal key','Dragon dart tip','Onyx bolt tips','Mystic hat',"Black d'hide shield",'Adamant platebody','Battlestaff','Rune shortsword','Runite bolts','Rune arrow','Diamond amulet','Raw shark','Great white shark jaw','Great white shark liver','Uncut sapphire','Uncut emerald','Uncut ruby','Uncut diamond','Loop half of key','Tooth half of key','Clue scroll (elite)']}};
+const empWL=w=>w==='osrs'?'jeu normal':'HC';
+const empDate=(t,y)=>new Date(t).toLocaleString('fr-BE',Object.assign({day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'},y?{year:'2-digit'}:{}));
+
+/* import Flipping Utilities : dossier plugin-data\flipping-utilities (sous-dossier hc = Hardcore Worlds) */
+function empParseFU(txt,path,defW){let J;try{J=JSON.parse(txt)}catch(e){return null}const out=[];
+  const P=String(path||'').replace(/\\/g,'/');const w=/(^|\/)hc\//i.test(P)?'hc':/flipping-utilities\//i.test(P)?'osrs':(defW||WORLD);
+  const stem=P.split('/').pop().replace(/\.json$/i,'').replace(/\.backup$/i,'');
+  if(/^accountwide$/i.test(stem)||/\.special$/i.test(stem))return out;
+  const acc=(A,who)=>{(A&&A.trades||[]).forEach(it=>{const last={};(it&&it.h&&it.h.sO||[]).forEach(o=>{const q=+o.cQIT||0,id=+(o.id||it.id),t=pfTime(o.t);if(!q||!id||!t||!(o.p>0))return;
+      const k=o.uuid||[w,who,id,o.s,o.b?1:0,t].join('|');if(!last[k]||q>=last[k].q)last[k]={k,w,who,id,name:it.name,b:o.b?1:0,q,p:+o.p,t}});out.push(...Object.values(last))})};
+  if(J&&Array.isArray(J.trades))acc(J,stem);else if(J&&typeof J==='object')Object.entries(J).forEach(([k,v])=>{if(v&&Array.isArray(v.trades))acc(v,k)});
+  return out}
+function empImport(list){let add=0,upd=0;for(const x of list){const o=empTx[x.k];
+    if(!o){empTx[x.k]=[x.w,x.who,x.id,x.name,x.b,x.q,x.p,x.t];add++}
+    else if(x.q>o[5]||(x.q===o[5]&&x.p!==o[6])){empTx[x.k]=[x.w,x.who,x.id,x.name,x.b,x.q,x.p,x.t];upd++}}
+  return {add,upd}}
+
+/* 🧪 tests de marché : masqués des calculs, jamais supprimés */
+function empHidden(k,r){if(emp.marks[k])return true;const R=emp.rules;
+  if(R.on&&r[5]*r[6]<R.min)return true;if(R.one&&r[5]===1)return true;
+  for(const x of R.items){if(x.id!==r[2])continue;if(x.side==='s'&&r[4])continue;if(x.side==='b'&&!r[4])continue;if(r[6]>=(x.lo||0)&&r[6]<=(x.hi==null||x.hi===''?Infinity:x.hi))return true}
+  return false}
+
+/* prix de rachat d'un magasin pour la k-ième vente dans le même monde (même formule que la Tournée PNJ) */
+function empNpcPrice(shop,id,k){const x=SHOPS.find(s=>s.shop===shop&&s.buy>0&&BYNAME[(s.item||'').toLowerCase()]===id);const m=MAP[id];if(!x||!m)return null;
+  const first=Math.max(x.buy,Math.floor(m.value*glovePct(shop,0)/100));const pct=first/m.value*100,chg=(x.delta||0)/10;
+  return chg?Math.floor(m.value*Math.max(10,pct-k*chg)/100):first}
+function empNpcRev(shop,id,q,per){if(!(q>0))return null;let s=0;per=per>0?per:q;for(let i=0;i<q;i++){const p=empNpcPrice(shop,id,i%per);if(p==null)return null;s+=p}return s}
+const empShopsFor=id=>[...new Set(SHOPS.filter(s=>s.buy>0&&!s.danger&&BYNAME[(s.item||'').toLowerCase()]===id).map(s=>s.shop))].sort((a,b)=>(empNpcPrice(b,id,0)||0)-(empNpcPrice(a,id,0)||0));
+function empAddNpc(x){emp.npc.push(Object.assign({k:empUid(),w:WORLD,who:emp.who||pfWho(),t:Date.now()},x));empSave()}
+
+/* calcul : FIFO par (monde, objet), tous persos confondus (les mules se passent les objets) */
+function empCalc(){const F=emp.f,now=Date.now(),t0=F.per==='all'?0:now-(+F.per)*864e5;
+  const srcSet=F.src&&EMP_SRC[F.src]?new Set(EMP_SRC[F.src].items.map(n=>n.toLowerCase())):null;
+  const okItem=(id,n)=>!srcSet||srcSet.has(empName(id,n).toLowerCase());
+  const ev=[];let hidden=0;
+  for(const [k,r] of Object.entries(empTx)){if(F.w!=='all'&&r[0]!==F.w)continue;if(empHidden(k,r)){hidden++;continue}ev.push({k,w:r[0],who:r[1],id:r[2],n:r[3],b:r[4],q:r[5],p:r[6],t:r[7],src:'ge'})}
+  for(const x of emp.npc){if(F.w!=='all'&&x.w!==F.w)continue;ev.push({k:x.k,w:x.w,who:x.who,id:x.id,n:empName(x.id),b:0,q:x.q,p:x.rev/x.q,t:x.t,src:'npc',shop:x.shop})}
+  ev.sort((a,b)=>a.t-b.t||b.b-a.b);
+  const P={},S={buy:0,sellGe:0,sellNpc:0,real:0,loot:0,n:0},who={},mon={};
+  const inWho=x=>!F.who||x.who===F.who;
+  for(const x of ev){const key=x.w+'|'+x.id;const o=P[key]||(P[key]={w:x.w,id:x.id,n:x.n,lots:[],real:0,loot:0,lootQ:0,soldQ:0,hold:0,buyG:0,sellG:0,last:0,cnt:0});
+    const inP=x.t>=t0&&inWho(x)&&okItem(x.id,x.n);o.last=Math.max(o.last,x.t);
+    const M=new Date(x.t).toISOString().slice(0,7),mo=inP&&(mon[M]=mon[M]||{buy:0,sell:0,real:0,loot:0}),wo=inP&&(who[x.who]=who[x.who]||{buy:0,sell:0,real:0,loot:0,n:0});
+    if(inP){S.n++;o.cnt++;wo.n++}
+    if(x.b){o.lots.push({q:x.q,p:x.p,t:x.t,who:x.who});if(inP){S.buy+=x.q*x.p;o.buyG+=x.q*x.p;mo.buy+=x.q*x.p;wo.buy+=x.q*x.p}continue}
+    const net=x.src==='npc'?x.p:empNet(x.p,x.w);let left=x.q,cost=0,hold=0;
+    while(left>0&&o.lots.length){const l=o.lots[0],k=Math.min(l.q,left);cost+=k*l.p;hold+=k*(x.t-l.t);l.q-=k;left-=k;if(!l.q)o.lots.shift()}
+    const got=x.q-left,real=got*net-cost,loot=left*net;
+    if(inP){S.real+=real;S.loot+=loot;S[x.src==='npc'?'sellNpc':'sellGe']+=x.q*net;o.real+=real;o.loot+=loot;o.lootQ+=left;o.soldQ+=got;o.hold+=hold;o.sellG+=x.q*net;
+      mo.sell+=x.q*net;mo.real+=real;mo.loot+=loot;wo.sell+=x.q*net;wo.real+=real;wo.loot+=loot}}
+  const items=Object.values(P).filter(o=>okItem(o.id,o.n)).map(o=>{const lots=o.lots.filter(l=>inWho(l));const q=lots.reduce((a,l)=>a+l.q,0),cost=lots.reduce((a,l)=>a+l.q*l.p,0);
+    const now=o.w===WORLD?pfSellNow(o.id):null;return Object.assign(o,{q,cost,first:lots.length?lots[0].t:null,now,val:now!=null&&q?q*empNet(now,o.w):null,holdH:o.soldQ?o.hold/o.soldQ/36e5:null})});
+  return {S,items,who,mon,hidden,t0}}
+
+/* chronos */
+const empClk=ms=>{const s=Math.floor(ms/1000);return `${Math.floor(s/3600)}:${String(Math.floor(s/60)%60).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`};
+const empChrMs=c=>c.acc+(c.on?Date.now()-c.on:0);
+function empSesGain(s){let real=0,loot=0;const lots={};const ev=[];
+  for(const [k,r] of Object.entries(empTx)){if(empHidden(k,r))continue;ev.push({w:r[0],who:r[1],id:r[2],b:r[4],q:r[5],p:r[6],t:r[7],npc:false})}
+  emp.npc.forEach(x=>ev.push({w:x.w,who:x.who,id:x.id,b:0,q:x.q,p:x.rev/x.q,t:x.t,npc:true}));ev.sort((a,b)=>a.t-b.t||b.b-a.b);
+  for(const x of ev){const key=x.w+'|'+x.id,L=lots[key]||(lots[key]=[]);if(x.b){L.push({q:x.q,p:x.p});continue}
+    const net=x.npc?x.p:empNet(x.p,x.w);let left=x.q,cost=0;while(left>0&&L.length){const l=L[0],k=Math.min(l.q,left);cost+=k*l.p;l.q-=k;left-=k;if(!l.q)L.shift()}
+    if(x.t>=s.a&&x.t<=s.b&&(!s.who||x.who===s.who)){real+=(x.q-left)*net-cost;loot+=left*net}}
+  return {real,loot,tot:real+loot,gph:s.dur>0?(real+loot)/(s.dur/36e5):null}}
+setInterval(()=>{if(tab!=='emp')return;document.querySelectorAll('[data-empclk]').forEach(el=>{const c=emp.chr.find(x=>x.k===el.dataset.empclk);if(c)el.textContent=empClk(empChrMs(c))})},1000);
+
+function empCsv(){const rows=[['date_heure','monde','perso','objet','sens','quantite','prix_unitaire','total_gp','source','test_masque']];
+  Object.entries(empTx).sort((a,b)=>a[1][7]-b[1][7]).forEach(([k,r])=>rows.push([new Date(r[7]).toLocaleString('fr-BE'),empWL(r[0]),r[1],empName(r[2],r[3]),r[4]?'achat':'vente',r[5],r[6],r[5]*r[6],'GE',empHidden(k,r)?'oui':'']));
+  emp.npc.forEach(x=>rows.push([new Date(x.t).toLocaleString('fr-BE'),empWL(x.w),x.who,empName(x.id),'vente PNJ',x.q,Math.round(x.rev/x.q),x.rev,x.shop,'']));
+  const csv=rows.map(r=>r.map(v=>/[";\n,]/.test(String(v))?'"'+String(v).replace(/"/g,'""')+'"':v).join(';')).join('\r\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv'}));a.download='hc-toolkit-empire-'+new Date().toISOString().slice(0,10)+'.csv';a.click()}
+
+function renderEmp(){const host=hostBox();$('#filters').innerHTML='';$('#more').hidden=true;$('.tablewrap').hidden=true;$('#tbl thead').innerHTML='';$('#tbl tbody').innerHTML='';
+  $('#intro').textContent='Tout ton historique GE (Flipping Utilities, tous les persos, HC et jeu normal) + tes ventes aux PNJ : ce que tu as vraiment gagné, ce qui marche, ce qui dort, et le vrai gp/h de tes activités avec les chronos. Rien n\'est jamais effacé : les tests de marché sont seulement masqués des calculs.';
+  const F=emp.f,n=Object.keys(empTx).length;const C=empCalc(),S=C.S;
+  const persos=[...new Set(Object.values(empTx).map(r=>r[1]).concat(emp.npc.map(x=>x.who)))].sort((a,b)=>a.localeCompare(b));
+  const seg=(k,opts)=>`<span class="fut-g">${opts.map(([v,t])=>`<button class="btn${String(F[k])===String(v)?' primary':''}" data-empf="${k}" data-v="${v}">${t}</button>`).join('')}</span>`;
+  const sg=v=>`<b class="${v>=0?'up':'down'}">${v>=0?'+':''}${gp(v)}</b>`;
+  const nm=o=>`${MAP[o.id]?`<img src="${icon(MAP[o.id])}" alt="">`:''}${esc(empName(o.id,o.n))}${F.w==='all'?` <span class="mut small">${empWL(o.w)}</span>`:''}`;
+  const R=emp.rules;
+  let h=`<section class="box"><h3>📂 Importer tes échanges</h3>
+    <p>Choisis le dossier <code>C:\\Users\\&lt;toi&gt;\\.runelite\\plugin-data\\flipping-utilities</code> : tous les persos sont lus d'un coup, le sous-dossier <code>hc</code> va dans les Hardcore Worlds, le reste dans le jeu normal. Réimporter ajoute seulement les nouveaux échanges (aucun doublon). Seul ce dossier est lu ; aucun identifiant n'y est stocké.</p>
+    <p><label class="btn primary">📁 Choisir le dossier<input type="file" id="empDir" webkitdirectory directory multiple hidden></label> <label class="btn">📄 ou des fichiers<input type="file" id="empFiles" accept=".json" multiple hidden></label>
+     <span class="small mut">(fichiers seuls : rangés dans ${WORLD_LABEL})</span> <button class="btn" data-empa="csv" ${n?'':'disabled'}>⬇ Exporter tout (CSV)</button></p>
+    <p id="empMsg" class="small">${n?`${nf.format(n)} échanges en mémoire${emp.imp?` · dernier import ${empDate(emp.imp.t)} : +${emp.imp.add} nouveaux, ${emp.imp.upd} mis à jour`:''}${emp.npc.length?` · ${emp.npc.length} vente(s) PNJ notée(s)`:''}`:'<span class="mut">Rien d\'importé pour l\'instant.</span>'}</p></section>`;
+  h+=`<section class="box emp-f"><div class="pf-ctl">${seg('w',[['all','🌍 Tout'],['hc','Hardcore'],['osrs','Jeu normal']])} ${seg('per',[['7','7 j'],['30','30 j'],['90','90 j'],['365','1 an'],['all','Tout']])}
+    <label class="small">Perso <select id="empWho"><option value="">Tous</option>${persos.map(p=>`<option ${F.who===p?'selected':''}>${esc(p)}</option>`).join('')}</select></label>
+    <label class="small">Source <select id="empSrc"><option value="">Tous les objets</option>${Object.entries(EMP_SRC).map(([k,o])=>`<option value="${k}" ${F.src===k?'selected':''}>${o.n}</option>`).join('')}</select></label></div>
+    <details class="emp-tests"${R.items.length||R.on||R.one?' open':''}><summary>🧪 Tests de marché : <b>${nf.format(C.hidden)}</b> échange(s) masqué(s) des calculs <span class="mut">(jamais supprimés)</span></summary>
+     <p><label><input type="checkbox" id="empROn" ${R.on?'checked':''}> Masquer les échanges de moins de <input type="number" id="empRMin" value="${R.min}" min="0" step="100" style="width:90px"> gp au total</label>
+      · <label><input type="checkbox" id="empROne" ${R.one?'checked':''}> Masquer les échanges d'un seul objet</label></p>
+     <form id="empRForm" class="pf-form" autocomplete="off">Pour <input id="empRIt" list="empDl" placeholder="objet" required> masquer les <select id="empRSide"><option value="s">ventes</option><option value="b">achats</option><option value="a">ventes et achats</option></select>
+      entre <input id="empRLo" type="number" min="0" value="0" style="width:90px"> et <input id="empRHi" type="number" min="0" placeholder="1000" style="width:90px"> gp pièce <button class="btn" type="submit">＋ Règle</button></form>
+     ${R.items.length?`<ul class="list">${R.items.map((x,i)=>`<li><span>${esc(empName(x.id))} : ${x.side==='s'?'ventes':x.side==='b'?'achats':'ventes et achats'} de ${gp(x.lo||0)} à ${x.hi==null||x.hi===''?'∞':gp(x.hi)} gp</span><button class="linkish" data-emprdel="${i}">✕</button></li>`).join('')}</ul>`:''}
+     <p class="small mut">Tu peux aussi masquer un échange précis avec 🧪 dans le journal d'un objet (clique sur une ligne).</p></details></section>`;
+  if(!n&&!emp.npc.length){host.innerHTML=h+empChrHtml()+empNpcHtml();return}
+  const valNow=C.items.reduce((a,o)=>a+(o.val||0),0),stockCost=C.items.reduce((a,o)=>a+o.cost,0),stockNA=C.items.filter(o=>o.q&&o.val==null).length;
+  h+=`<section class="box"><div class="kv"><div><span>Profit réalisé (GE + PNJ)</span>${sg(S.real)}</div><div><span>Vendu sans achat (butin, fabrication)</span><b class="up">+${gp(S.loot)}</b></div>
+    <div><span>Achats</span><b>${gp(S.buy)}</b></div><div><span>Ventes GE (net)</span><b>${gp(S.sellGe)}</b></div><div><span>Ventes PNJ</span><b>${gp(S.sellNpc)}</b></div>
+    <div><span>Stock pas revendu (coût)</span><b>${gp(stockCost)}</b></div><div><span>… vaut maintenant</span><b>${gp(valNow)}${stockNA?` <small class="mut">+ ${stockNA} N/A</small>`:''}</b></div></div>
+    <p class="small mut">${F.per==='all'?'Tout l\'historique':'Sur '+F.per+' jours'}${F.who?' · '+esc(F.who):''}${F.src?' · '+EMP_SRC[F.src].n:''} · FIFO tous persos confondus (les mules se passent les objets) · taxe GE 2 % déduite en jeu normal · ${S.n} échanges. « Vaut maintenant » : prix ${WORLD_LABEL} ; l'autre monde est en N/A (change de monde pour le voir).</p></section>`;
+  h+=empChrHtml();
+  const tbl=(title,L,cols,empty)=>`<section class="box"><h3>${title}</h3>${L.length?`<div class="tablewrap"><table class="eqt emp-t"><thead><tr>${cols.map((c,i)=>`<th${i?'':' class="l"'}>${c[0]}</th>`).join('')}</tr></thead><tbody>${L.map(o=>`<tr data-empid="${o.id}" data-empw="${o.w}" style="cursor:pointer">${cols.map((c,i)=>`<td${i?'':' class="l"'}>${c[1](o)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`:`<p class="mut">${empty}</p>`}</section>`;
+  const hold=o=>o.holdH==null?'–':o.holdH<48?Math.round(o.holdH)+' h':Math.round(o.holdH/24)+' j';
+  const good=C.items.filter(o=>o.real>0).sort((a,b)=>b.real-a.real).slice(0,12),bad=C.items.filter(o=>o.real<0).sort((a,b)=>a.real-b.real).slice(0,12);
+  h+=`<div class="emp-2">`+tbl('✅ Ce qui marche',good,[['Objet',nm],['Profit',o=>sg(o.real)],['Revendus',o=>gp(o.soldQ)],['Par pièce',o=>gp(o.real/o.soldQ)],['Gardé',hold]],'Aucun profit sur la période.')
+    +tbl('❌ Ce qui ne marche pas',bad,[['Objet',nm],['Perte',o=>sg(o.real)],['Revendus',o=>gp(o.soldQ)],['Par pièce',o=>gp(o.real/o.soldQ)],['Gardé',hold]],'Aucune perte sur la période 👍')+`</div>`;
+  const loot=C.items.filter(o=>o.loot>0).sort((a,b)=>b.loot-a.loot).slice(0,15);
+  h+=tbl('🎁 Vendu sans l\'avoir acheté au GE (butin, fabrication, récolte)',loot,[['Objet',nm],['Rapporté',o=>`<b class="up">+${gp(o.loot)}</b>`],['Quantité',o=>gp(o.lootQ)],['Par pièce',o=>gp(o.loot/o.lootQ)]],'Rien sur la période.');
+  const dorm=C.items.filter(o=>o.q>0).sort((a,b)=>b.cost-a.cost).slice(0,20);
+  h+=`<section class="box"><h3>💤 Acheté et pas revendu au GE</h3><p class="small mut">Vendu à un PNJ, alché, utilisé, ou encore en banque. Si c'est parti chez un PNJ, clique sur 🏪 pour le noter : le profit devient réel.</p>${dorm.length?`<div class="tablewrap"><table class="eqt emp-t"><thead><tr><th class="l">Objet</th><th>Qté</th><th>Coût</th><th>Vaut</th><th>Depuis</th><th>Perso(s)</th><th></th></tr></thead><tbody>${dorm.map(o=>{const ws=[...new Set(o.lots.map(l=>l.who))];const age=o.first?(Date.now()-o.first)/864e5:0;
+     return `<tr data-empid="${o.id}" data-empw="${o.w}" style="cursor:pointer"><td class="l">${nm(o)}${age>3?' <span class="pill warn" title="Acheté il y a plus de 3 jours">dort</span>':''}</td><td>${gp(o.q)}</td><td>${gp(o.cost)}</td><td>${o.val!=null?gp(o.val):'<span class="mut">N/A</span>'}</td><td>${o.first?pfAge(o.first):'–'}</td><td class="small">${esc(ws.slice(0,3).join(', '))}${ws.length>3?'…':''}</td><td><button class="btn" data-empnpc="${o.id}" data-empw="${o.w}" data-q="${o.q}" ${o.w===WORLD?'':'disabled title="Change de monde pour les prix des magasins"'}>🏪</button></td></tr>`}).join('')}</tbody></table></div>`:'<p class="mut">Tout ce que tu as acheté a été revendu.</p>'}</section>`;
+  h+=empNpcHtml();
+  const W=Object.entries(C.who).sort((a,b)=>(b[1].real+b[1].loot)-(a[1].real+a[1].loot));
+  h+=`<section class="box"><h3>👥 Par perso</h3><div class="tablewrap"><table class="eqt"><thead><tr><th class="l">Perso</th><th>Échanges</th><th>Achats</th><th>Ventes</th><th>Profit réalisé</th><th>Sans achat</th></tr></thead><tbody>${W.map(([w,o])=>`<tr><td class="l">${esc(w)}</td><td>${o.n}</td><td>${gp(o.buy)}</td><td>${gp(o.sell)}</td><td>${sg(o.real)}</td><td>${o.loot?'+'+gp(o.loot):'–'}</td></tr>`).join('')}</tbody></table></div><p class="small mut">Le profit d'une vente va au perso qui a vendu, même si une mule avait acheté.</p></section>`;
+  const Mo=Object.entries(C.mon).sort((a,b)=>b[0].localeCompare(a[0]));const mx=Math.max(1,...Mo.map(([,o])=>Math.abs(o.real+o.loot)));
+  h+=`<section class="box"><h3>📅 Par mois</h3><div class="tablewrap"><table class="eqt"><thead><tr><th class="l">Mois</th><th>Achats</th><th>Ventes</th><th>Profit réalisé</th><th>Sans achat</th><th class="l">Total</th></tr></thead><tbody>${Mo.map(([m,o])=>{const t=o.real+o.loot;return `<tr><td class="l">${new Date(m+'-15').toLocaleDateString('fr-BE',{month:'long',year:'numeric'})}</td><td>${gp(o.buy)}</td><td>${gp(o.sell)}</td><td>${sg(o.real)}</td><td>${o.loot?'+'+gp(o.loot):'–'}</td><td class="l"><span class="emp-bar ${t>=0?'up':'down'}" style="width:${Math.round(Math.abs(t)/mx*120)}px"></span> ${sg(t)}</td></tr>`}).join('')}</tbody></table></div></section>`;
+  if(emp.open){const [w,id]=[emp.open.w,+emp.open.id];const L=Object.entries(empTx).filter(([,r])=>r[0]===w&&r[2]===id).sort((a,b)=>b[1][7]-a[1][7]);const N=emp.npc.filter(x=>x.w===w&&x.id===id);const o=C.items.find(x=>x.w===w&&x.id===id);
+    h+=`<section class="box" id="empDet"><div class="fut-head">${MAP[id]?`<img src="${icon(MAP[id])}" alt="">`:''}<h3>${esc(empName(id,L[0]&&L[0][1][3]))} <span class="mut small">${empWL(w)}</span></h3>${o?`<span class="pill">réalisé ${o.real>=0?'+':''}${gp(o.real)}</span>${o.q?`<span class="pill">${gp(o.q)} pas revendus</span>`:''}`:''}<button class="btn" data-empa="close">✕</button></div>
+     <ul class="list">${N.map(x=>`<li><span><b class="up">Vente PNJ</b> ${gp(x.q)} → ${gp(x.rev)} gp · ${esc(x.shop||'')} · ${esc(x.who)}</span><span class="mut">${empDate(x.t,1)} <button class="linkish" data-empndel="${x.k}" title="Supprimer cette vente PNJ (2 clics)">✕</button></span></li>`).join('')}
+     ${L.slice(0,300).map(([k,r])=>{const hd=empHidden(k,r);return `<li class="${hd?'mut':''}"><span>${r[4]?'<b class="up">Achat</b>':'<b class="down">Vente</b>'} ${gp(r[5])} × ${gp(r[6])} gp = ${gp(r[5]*r[6])} · ${esc(r[1])}${hd?' · 🧪 masqué':''}</span><span class="mut">${empDate(r[7],1)} <button class="linkish" data-empmark="${esc(k)}" title="${emp.marks[k]?'Remettre dans les calculs':'Masquer : test de marché'}">${emp.marks[k]?'↺':'🧪'}</button></span></li>`}).join('')}</ul>${L.length>300?`<p class="small mut">300 derniers sur ${L.length} (tout est dans l'export CSV).</p>`:''}</section>`}
+  host.innerHTML=h;const d=$('#empDet');if(d&&emp.scroll){d.scrollIntoView({block:'start'});emp.scroll=false}}
+
+function empChrHtml(){const run=emp.chr;const ses=emp.ses.slice(-12).reverse();
+  const by={};emp.ses.forEach(s=>{const g=empSesGain(s);const o=by[s.name]||(by[s.name]={dur:0,tot:0,n:0});o.dur+=s.dur;o.tot+=g.tot;o.n++});
+  return `<section class="box"><h3>⏱️ Chronos d'activité</h3><p class="small mut">Lance un chrono quand tu commences une activité (une tournée PNJ, des cannonballs, des requins…), arrête-le à la fin : le Toolkit prend tout ce qui a été vendu pendant ce temps (GE et PNJ, par le perso choisi ou tous) et te donne le <b>vrai gp/h</b>. Aucun son.</p>
+   <form id="empChrForm" class="pf-form" autocomplete="off"><input id="empChrN" placeholder="Activité (ex. Tournée Seddu)" list="empChrL" required><datalist id="empChrL">${Object.keys(by).map(n=>`<option value="${esc(n)}">`).join('')}</datalist>
+    <label>perso <select id="empChrW"><option value="">tous</option>${[...new Set(Object.values(empTx).map(r=>r[1]))].sort().map(p=>`<option>${esc(p)}</option>`).join('')}</select></label><button class="btn primary" type="submit">▶ Lancer</button></form>
+   ${run.length?`<div class="emp-chr">${run.map(c=>`<div class="emp-c"><b>${esc(c.name)}</b>${c.who?` <span class="mut small">${esc(c.who)}</span>`:''}<span class="emp-clk" data-empclk="${c.k}">${empClk(empChrMs(c))}</span>
+     <button class="btn" data-empc="${c.on?'pause':'go'}" data-k="${c.k}">${c.on?'⏸':'▶'}</button><button class="btn primary" data-empc="stop" data-k="${c.k}">⏹ Fin</button><button class="linkish" data-empc="drop" data-k="${c.k}" title="Annuler sans enregistrer (2 clics)">✕</button></div>`).join('')}</div>`:''}
+   ${ses.length?`<div class="tablewrap"><table class="eqt"><thead><tr><th class="l">Activité</th><th>Début</th><th>Durée</th><th>Profit</th><th>gp/h</th><th></th></tr></thead><tbody>${ses.map(s=>{const g=empSesGain(s);return `<tr><td class="l">${esc(s.name)}${s.who?` <span class="mut small">${esc(s.who)}</span>`:''}</td><td>${empDate(s.a)}</td><td>${empClk(s.dur)}</td><td class="${g.tot>=0?'up':'down'}">${g.tot>=0?'+':''}${gp(g.tot)}${g.loot?` <small class="mut" title="dont vendu sans achat">(${gp(g.loot)} butin)</small>`:''}</td><td><b>${g.gph==null?'–':gp(g.gph)}</b></td><td><button class="linkish" data-empsdel="${s.k}" title="Supprimer (2 clics)">✕</button></td></tr>`}).join('')}</tbody></table></div>
+     ${Object.keys(by).length>1?`<p class="small">Moyenne par activité : ${Object.entries(by).sort((a,b)=>b[1].tot/b[1].dur-a[1].tot/a[1].dur).map(([n,o])=>`<b>${esc(n)}</b> ${gp(o.dur?o.tot/(o.dur/36e5):0)}/h (${o.n})`).join(' · ')}</p>`:''}
+     <p class="small mut">Les ventes comptent au moment où elles passent : réimporte Flipping Utilities après l'activité pour mettre le gp/h à jour.</p>`:''}</section>`}
+
+function empNpcHtml(){const f=emp.nf||{};const id=f.id,shops=id?empShopsFor(id):[];const shop=shops.includes(f.shop)?f.shop:shops[0];const q=+f.q||0,per=+f.per||0;
+  const rev=id&&shop&&q?empNpcRev(shop,id,q,per):null;
+  return `<section class="box" id="empNpc"><h3>🏪 Noter une vente à un PNJ</h3><form id="empNpcForm" class="pf-form" autocomplete="off">
+   <input id="empNIt" list="empDl" placeholder="Objet" value="${id?esc(empName(id)):''}" required><datalist id="empDl">${futDl()}</datalist>
+   <label>× <input id="empNQ" type="number" min="1" value="${q||''}" style="width:90px"></label>
+   <label>à <select id="empNShop">${shops.length?shops.map(s=>`<option ${s===shop?'selected':''}>${esc(s)}</option>`).join(''):'<option value="">aucun magasin connu</option>'}</select></label>
+   <label>par monde <input id="empNPer" type="number" min="0" value="${per||''}" placeholder="tout" style="width:70px"></label>
+   <label>= <input id="empNRev" type="number" min="0" value="${f.rev!=null?f.rev:rev!=null?rev:''}" placeholder="total gp" style="width:120px"> gp</label>
+   <label>perso <input id="empNWho" list="empWl" value="${esc(emp.who||pfWho())}" style="width:120px"></label><datalist id="empWl">${[...new Set(Object.values(empTx).map(r=>r[1]))].map(p=>`<option value="${esc(p)}">`).join('')}</datalist>
+   <button class="btn primary" type="submit">Noter ⏎</button></form>
+   <p class="small mut">Le total se calcule avec la baisse de prix du magasin à chaque vente (le prix remonte dans chaque nouveau monde) : corrige-le si tu as touché autre chose. ${WORLD_LABEL}. Dans la 🏪 Vitrine, le bouton « ✅ Pack vendu » d'un pack le note en 1 clic.</p></section>`}
+
+VIEWS.emp={label:'Mon empire 🏦',custom:true,render:()=>renderEmp()};
+MOVES.emp=['📂 Choisis le dossier flipping-utilities','🏪 Note tes ventes PNJ','⏱️ Chronomètre tes activités → vrai gp/h'];
+NEWTABS.add('emp');
+{const g=GROUPS.find(x=>x[0]==='ge');if(g&&!g[2].includes('emp'))g[2].unshift('emp')}
+{const st=document.createElement('style');st.textContent=`.emp-2{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:0 14px}.emp-t img,#empDet img{height:20px;vertical-align:middle;margin-right:4px}
+.emp-bar{display:inline-block;height:10px;vertical-align:middle;border-radius:2px;background:var(--up)}.emp-bar.down{background:var(--down)}
+.emp-chr{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}.emp-c{display:flex;gap:8px;align-items:center;padding:6px 10px;border:2px solid var(--line);border-radius:4px}
+.emp-clk{font:700 18px var(--f-mono);color:var(--yel);min-width:86px;text-align:right}.emp-tests summary{cursor:pointer}`;document.head.appendChild(st)}
+let empArm=null;const empTwice=k=>{if(empArm===k){empArm=null;return true}empArm=k;setTimeout(()=>{if(empArm===k)empArm=null},4000);return false};
+async function empReadFiles(files){let all=[],bad=0,read=0;for(const f of files){if(!/\.json$/i.test(f.name))continue;const L=empParseFU(await f.text(),f.webkitRelativePath||f.name,WORLD);if(L){all=all.concat(L);read++}else bad++}
+  const r=empImport(all);const ok=empSaveTx();emp.imp={t:Date.now(),add:r.add,upd:r.upd};empSave();render();
+  const m=$('#empMsg');if(m)m.innerHTML=`✔ ${read} fichier(s) lu(s) : <b>${r.add}</b> nouveaux échanges, ${r.upd} mis à jour, ${nf.format(Object.keys(empTx).length)} en mémoire${bad?` · ${bad} fichier(s) illisible(s)`:''}${ok?'':' · <b class="down">mémoire du navigateur pleine : exporte en CSV</b>'}.`}
+document.addEventListener('change',async e=>{if(tab!=='emp')return;const t=e.target;
+  if((t.id==='empDir'||t.id==='empFiles')&&t.files.length){await empReadFiles([...t.files]);return}
+  if(t.id==='empWho'){emp.f.who=t.value;empSave();render();return}
+  if(t.id==='empSrc'){emp.f.src=t.value;empSave();render();return}
+  if(t.id==='empROn'||t.id==='empROne'){emp.rules[t.id==='empROn'?'on':'one']=t.checked;empSave();render();return}
+  if(t.id==='empRMin'){emp.rules.min=Math.max(0,+t.value||0);empSave();render();return}
+  if(t.id==='empNShop'||t.id==='empNIt'||t.id==='empNQ'||t.id==='empNPer'){const nf_=emp.nf||(emp.nf={});const id=BYNAME[($('#empNIt').value||'').trim().toLowerCase()];
+    nf_.id=id||null;nf_.q=+$('#empNQ').value||0;nf_.per=+$('#empNPer').value||0;nf_.shop=$('#empNShop').value;delete nf_.rev;render();const s=$('#empNpc');s&&s.scrollIntoView({block:'center'});return}
+  if(t.id==='empNRev'){(emp.nf||(emp.nf={})).rev=t.value===''?null:+t.value}});
+document.addEventListener('submit',e=>{if(tab!=='emp')return;const t=e.target;
+  if(t.id==='empRForm'){e.preventDefault();const id=BYNAME[($('#empRIt').value||'').trim().toLowerCase()];if(!id){$('#empRIt').value='';$('#empRIt').placeholder='objet inconnu';return}
+    const hi=$('#empRHi').value;emp.rules.items.push({id,side:$('#empRSide').value,lo:+$('#empRLo').value||0,hi:hi===''?null:+hi});empSave();render();return}
+  if(t.id==='empChrForm'){e.preventDefault();const name=($('#empChrN').value||'').trim();if(!name)return;emp.chr.push({k:empUid(),name,who:$('#empChrW').value,acc:0,on:Date.now(),a:Date.now()});empSave();render();return}
+  if(t.id==='empNpcForm'){e.preventDefault();const id=BYNAME[($('#empNIt').value||'').trim().toLowerCase()],q=Math.round(+$('#empNQ').value||0),rev=+$('#empNRev').value;
+    if(!id||!q||!(rev>=0)||$('#empNRev').value===''){$('#empNRev').placeholder='total ?';return}
+    const who=($('#empNWho').value||'').trim()||pfWho();emp.who=who;empAddNpc({id,q,rev,shop:$('#empNShop').value,who});emp.nf={};render()}});
+document.addEventListener('click',e=>{if(tab!=='emp')return;const t=e.target.closest('[data-empf],[data-empa],[data-empid],[data-empmark],[data-emprdel],[data-empc],[data-empsdel],[data-empndel],[data-empnpc]');if(!t)return;
+  if(t.dataset.empf){emp.f[t.dataset.empf]=t.dataset.v;empSave();render();return}
+  if(t.dataset.empa==='csv'){empCsv();return}
+  if(t.dataset.empa==='close'){emp.open=null;empSave();render();return}
+  if(t.dataset.empnpc){e.stopPropagation();emp.nf={id:+t.dataset.empnpc,q:+t.dataset.q};render();const s=$('#empNpc');s&&s.scrollIntoView({block:'center'});return}
+  if(t.dataset.empmark){const k=t.dataset.empmark;if(emp.marks[k])delete emp.marks[k];else emp.marks[k]=1;empSave();render();return}
+  if(t.dataset.emprdel!=null){emp.rules.items.splice(+t.dataset.emprdel,1);empSave();render();return}
+  if(t.dataset.empndel){if(!empTwice('n'+t.dataset.empndel)){t.textContent='sûr ?';return}emp.npc=emp.npc.filter(x=>x.k!==t.dataset.empndel);empSave();render();return}
+  if(t.dataset.empsdel){if(!empTwice('s'+t.dataset.empsdel)){t.textContent='sûr ?';return}emp.ses=emp.ses.filter(x=>x.k!==t.dataset.empsdel);empSave();render();return}
+  if(t.dataset.empc){const c=emp.chr.find(x=>x.k===t.dataset.k);if(!c)return;const a=t.dataset.empc,now=Date.now();
+    if(a==='pause'&&c.on){c.acc+=now-c.on;c.on=null}else if(a==='go'&&!c.on)c.on=now;
+    else if(a==='stop'){if(c.on){c.acc+=now-c.on;c.on=null}emp.ses.push({k:c.k,name:c.name,who:c.who,a:c.a,b:now,dur:c.acc});emp.chr=emp.chr.filter(x=>x!==c)}
+    else if(a==='drop'){if(!empTwice('c'+c.k)){t.textContent='sûr ?';return}emp.chr=emp.chr.filter(x=>x!==c)}
+    empSave();render();return}
+  if(t.dataset.empid){emp.open={id:+t.dataset.empid,w:t.dataset.empw};emp.scroll=true;empSave();render()}});
+/* 🏪 Vitrine : « ✅ Pack vendu » note tout le pack comme vendu au PNJ (quantités et prix du pack, modifiables ensuite dans 🏦 Mon empire) */
+{const _w=vtPackWin;vtPackWin=function(p){_w(p);const w=WINS['vtp:'+p.shop];if(!w||w.querySelector('#vtSold'))return;const box=w.querySelector('#vtCopyMsg');if(!box)return;
+  const b=document.createElement('button');b.className='linkish';b.id='vtSold';b.textContent='✅ Pack vendu (noter dans 🏦 Mon empire)';box.before(b,document.createTextNode(' · '));
+  b.onclick=()=>{let n=0,tot=0;p.items.forEach(x=>{const q=x.Q|0;if(!q)return;const rev=empNpcRev(p.shop,x.id,q,x.fixed?0:x.per)??Math.round(q*x.first);empAddNpc({id:x.id,q,rev,shop:p.shop});n++;tot+=rev});
+    b.textContent=`✔ ${n} objet(s) notés : ${gp(tot)} gp encaissés`;b.disabled=true}}}
+
 applyCompact();if(WORLD==='osrs')document.body.classList.add('osrs');
 {const ls=$('.logo-s');if(ls)ls.firstChild.textContent=(WORLD==='osrs'?'OSRS normal (taxe 2 %)':'Hardcore Worlds')+' · ';}
 document.title=WORLD==='osrs'?'HC Toolkit · OSRS':'HC Toolkit';
