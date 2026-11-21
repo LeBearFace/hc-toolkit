@@ -3991,7 +3991,7 @@ function renderEmp(){const host=hostBox();$('#filters').innerHTML='';$('#more').
   const R=emp.rules;
   let h=`<section class="box"><h3>📂 Importer tes échanges</h3>
     <p>Choisis le dossier <code>C:\\Users\\&lt;toi&gt;\\.runelite\\plugin-data\\flipping-utilities</code> : tous les persos sont lus d'un coup, le sous-dossier <code>hc</code> va dans les Hardcore Worlds, le reste dans le jeu normal. Réimporter ajoute seulement les nouveaux échanges (aucun doublon). Seul ce dossier est lu ; aucun identifiant n'y est stocké.</p>
-    <p><label class="btn primary">📁 Choisir le dossier<input type="file" id="empDir" webkitdirectory directory multiple hidden></label> <label class="btn">📄 ou des fichiers<input type="file" id="empFiles" accept=".json" multiple hidden></label>
+    <p><label class="btn primary">📁 1. Échanges : dossier <code>flipping-utilities</code><input type="file" id="empDir" webkitdirectory directory multiple hidden></label> <label class="btn">📄 ou des fichiers<input type="file" id="empFiles" accept=".json" multiple hidden></label> <label class="btn primary">🏦 2. Banques : dossier <code>data-exports</code><input type="file" id="empDE2" webkitdirectory directory multiple hidden></label>
      <span class="small mut">(fichiers seuls : rangés dans ${WORLD_LABEL})</span> <button class="btn" data-empa="csv" ${n?'':'disabled'}>⬇ Exporter tout (CSV)</button></p>
     <p id="empMsg" class="small">${n?`${nf.format(n)} échanges en mémoire${emp.imp?` · dernier import ${empDate(emp.imp.t)} : +${emp.imp.add} nouveaux, ${emp.imp.upd} mis à jour`:''}${emp.npc.length?` · ${emp.npc.length} vente(s) PNJ notée(s)`:''}`:'<span class="mut">Rien d\'importé pour l\'instant.</span>'}</p></section>`;
   h+=`<section class="box emp-f"><div class="pf-ctl">${seg('w',[['all','🌍 Tout'],['hc','Hardcore'],['osrs','Jeu normal']])} ${seg('per',[['7','7 j'],['30','30 j'],['90','90 j'],['365','1 an'],['all','Tout']])}
@@ -4218,7 +4218,7 @@ document.addEventListener('click',e=>{if(tab!=='peaks')return;const t=e.target.c
 document.addEventListener('change',e=>{if(tab==='peaks'&&e.target.id==='pkMine'){pk.mine=e.target.checked;pkSave();render()}});
 
 /* Mon empire : import Data Export, persos, courbe de la fiche */
-document.addEventListener('change',async e=>{if(tab!=='emp'||e.target.id!=='empDE'||!e.target.files.length)return;const L=[];for(const f of e.target.files){if(/\.json$/i.test(f.name))L.push(empParseDE(await f.text(),f.name))}
+document.addEventListener('change',async e=>{if(tab!=='emp'||!/^empDE2?$/.test(e.target.id)||!e.target.files.length)return;const L=[];for(const f of e.target.files){if(/\.json$/i.test(f.name))L.push(empParseDE(await f.text(),f.name))}
   const r=empImportDE(L.filter(Boolean));render();const m=$('#empMsg');if(m)m.innerHTML=`✔ Data Export : ${r.n} export(s) retenu(s) pour ${r.who} perso(s) (le plus récent de chacun).`});
 document.addEventListener('click',e=>{if(tab!=='emp')return;const t=e.target.closest('[data-empwho],[data-empa="bankall"],[data-empa="bankwho"]');if(!t)return;
   if(t.dataset.empwho){emp.bankWho=t.dataset.empwho;empSave();render();return}if(t.dataset.empa==='bankall'){emp.bankAll=!emp.bankAll;empSave();render();return}
