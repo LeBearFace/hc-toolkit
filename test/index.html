@@ -384,7 +384,7 @@ body.compact .atl-mods{grid-template-columns:1fr}
 <body>
 <header id="hd">
   <div class="bar">
-    <div class="logo"><button class="logo-b" data-tab="home" title="Accueil"><span class="logo-mark" aria-hidden="true">HC</span><span class="logo-t">HC Toolkit</span></button><small class="logo-s">Hardcore Worlds · <button class="linkish" id="changelog" title="Nouveautés">v1.9</button></small></div>
+    <div class="logo"><button class="logo-b" data-tab="home" title="Accueil"><span class="logo-mark" aria-hidden="true">HC</span><span class="logo-t">HC Toolkit</span></button><small class="logo-s">Hardcore Worlds · <button class="linkish" id="changelog" title="Nouveautés">v2.2</button></small></div>
     <div class="search"><input id="q" type="search" placeholder="Rechercher un objet…   ( / )" autocomplete="off"><button class="btn kbtn" id="palBtn" title="Aller n'importe où (Ctrl+K)">⌘K</button></div>
     <div class="ctrl">
       <span class="status" id="status">Chargement…</span>
@@ -2197,6 +2197,11 @@ function setLive(sec){liveSec=+sec;store.set('liveSec',liveSec);clearInterval(li
 function favRows(){const ids=[...favs].filter(id=>MAP[id]);hcwWant(ids);wantSpark(ids);return ids.map(id=>base(id))}
 
 const CHANGELOG=`<div class="dh"><h2>Nouveautés</h2><button class="btn" id="close">Fermer</button></div>
+ <div class="box"><h3>v2.2 « Plan de sortie & XP en banque » · 21 novembre 2026</h3><ul class="list"><li><span><b>🧭 Plan de sortie</b> (🏦 Mon empire) : chaque objet de tes banques rangé en 🏪 PNJ (magasin, ventes par monde, mondes), ✨ alch, 🔨 transformer, 📈 GE ou N/A, avec le gain par rapport au GE et le perso qui l'a.</span></li>
+  <li><span><b>🧮 XP en banque</b> (Métiers & XP) : l'XP qui dort par compétence, ce qu'il faudrait acheter pour aller plus loin, et quel perso en profiterait le plus.</span></li></ul></div>
+ <div class="box"><h3>v2.1 « Espaces » · 21 novembre 2026</h3><ul class="list"><li><span><b>Menu de gauche en espaces</b> (Hôtel des ventes, PNJ, Transformer, Quêtes & guides, Métiers & XP…) : un seul ouvert à la fois, icônes du jeu, style des panneaux du jeu.</span></li>
+  <li><span><b>🎯 Pics répétés</b> : ⭐ Must / 👀 Watch / 🧪 Oddities. <b>Banques Data Export</b> et <b>courbes</b> dans 🏦 Mon empire.</span></li></ul></div>
+ <div class="box"><h3>v2.0 « Mon empire » · 21 novembre 2026</h3><ul class="list"><li><span><b>🏦 Mon empire</b> : tout ton historique GE (Flipping Utilities, tous les persos, HC et normal), tests de marché masqués, ventes PNJ, ⏱️ chronos, export CSV.</span></li></ul></div>
  <div class="box"><h3>v1.9 « Vitrine » · 20 novembre 2026</h3><ul class="list"><li><span><b>🏪 Vitrine</b> : nouvel accueil en cartes, ouvert au lancement. « Passer → » te ramène au dernier module ; l'accueil classique reste à un clic.</span></li>
   <li><span><b>🎒 Packs PNJ</b> : pour chaque marchand, tous les objets qu'il rachète avec profit, à acheter d'un coup au GE (quantité calculée pour tes mondes, plafonnée par la limite GE et le volume réel), puis à revendre monde après monde. Fenêtre détaillée avec liste d'achat à copier et accès.</span></li>
   <li><span><b>Filtres</b> : intensité (⚡ plus rapide / ⚖️ équilibré / 💰 plus rentable), nombre de mondes, budget, quantité max par objet, gain minimum, sections à afficher.</span></li>
