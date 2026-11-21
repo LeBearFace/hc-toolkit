@@ -4275,9 +4275,12 @@ tr.pk-must td:first-child{box-shadow:inset 3px 0 0 var(--yel)}tr.pk-odd td:first
 function empStock(only){const S={};for(const [who,P] of Object.entries(empBanks)){if(!P.bank||P.w!==WORLD||(only&&who!==only))continue;
   for(const [name,q] of Object.entries(P.bank.items)){if(name==='Coins')continue;const id=BYNAME[name.toLowerCase()];const k=id!=null?id:'n:'+name;const o=S[k]||(S[k]={id,name,q:0,who:{}});o.q+=q;o.who[who]=(o.who[who]||0)+q}}return S}
 // meilleure transformation : valeur d'UN exemplaire de l'objet une fois transformé (revente du produit − autres ingrédients)
-function empCraftVal(id){let best=null;try{for(const r of usesRows(id).slice(0,12)){if(r.rev==null||r.lock)continue;const me=r.mats.find(x=>x.id===id);if(!me||!(me.q>0))continue;
+function empCraftVal(id){let best=null;const m=MAP[id];if(!m||/ rune$/i.test(m.name))return null; // les runes sont des catalyseurs, pas une matière à transformer
+  try{for(const r of usesRows(id).slice(0,12)){if(r.rev==null||r.lock||!r.e)continue;const me=r.mats.find(x=>x.id===id);if(!me||!(me.q>0))continue;
+  const d=D24[r.oid]||{},vol=(d.highPriceVolume||0)+(d.lowPriceVolume||0);if(r.e.kind!=='alch'&&r.e.kind!=='npc'&&vol<100)continue; // produit trop peu échangé : prix pas fiable
   const other=r.mats.reduce((a,x)=>a+(x===me?0:(x.s?x.s.p*x.q:Infinity)),0);if(!isFinite(other))continue;const v=(r.rev-other)/me.q;
-  if(best==null||v>best.v)best={v,out:r.r.out,need:r.lv.map(s=>s.n+' '+s.l).join(', '),q:me.q}}}catch(e){}return best}
+  const cap=r.e.kind==='alch'||r.e.kind==='npc'?Infinity:Math.floor(vol*2*me.q/(r.r.oq||1)); // pas plus que ~2 jours de volume du produit
+  if(best==null||v>best.v)best={v,out:r.r.out,need:r.lv.map(s=>s.n+' '+s.l).join(', '),q:me.q,cap}}}catch(e){}return best}
 // ventes PNJ : combien d'affilée par monde avant de tomber sous le GE
 function empShopPlan(shop,id,floor){let n=0,rev=0;for(let k=0;k<300;k++){const p=empNpcPrice(shop,id,k);if(p==null||p<=floor)break;n++;rev+=p;const x=SHOPS.find(s=>s.shop===shop&&BYNAME[(s.item||'').toLowerCase()]===id);if(!x||!x.delta){n=Infinity;break}}return n}
 let _shopIdx=null,_shopN=0;empShopsFor=function(id){if(!_shopIdx||_shopN!==SHOPS.length){_shopIdx={};_shopN=SHOPS.length;SHOPS.forEach(s=>{if(!(s.buy>0)||s.danger)return;const i=BYNAME[(s.item||'').toLowerCase()];if(i==null)return;(_shopIdx[i]=_shopIdx[i]||new Set()).add(s.shop)})}
@@ -4292,6 +4295,7 @@ function empPlan0(){const S=empStock();const out=[];
     let per=null,worlds=null,q=o.q;if(k==='npc'){per=empShopPlan(x.shopN,o.id,Math.max(x.ge||0,x.alch||0));if(per===Infinity)worlds=1;else if(per>0)worlds=Math.ceil(q/per);else{opts.shift();[k,unit]=opts[0]||['na',null]}}
     // pour la vente PNJ, revenu réaliste avec la baisse de prix (mondes successifs)
     let total=unit!=null?unit*q:null;if(k==='npc'&&per&&per!==Infinity){const r=empNpcRev(x.shopN,o.id,q,per);if(r!=null)total=r}
+    if(k==='craft'&&c.cap<q){const alt=opts.find(z=>z[0]!=='craft');total=c.cap*c.v+(q-c.cap)*(alt?alt[1]:0);unit=total/q;if(alt&&unit<alt[1]){[k,unit]=alt;total=unit*q}}
     const gain=x.ge!=null&&total!=null&&k!=='ge'?total-x.ge*q:0;out.push({o,k,unit,total,gain,x,c,per,worlds})}
   return out}
 const PLAN_K={npc:['🏪','Vendre aux PNJ'],alch:['✨','Alcher'],craft:['🔨','Transformer'],ge:['📈','Vendre au GE'],na:['❔','Sans prix (N/A)']};
@@ -4314,18 +4318,18 @@ document.addEventListener('click',e=>{if(tab!=='emp')return;const t=e.target.clo
 
 /* ---------- 🧮 XP en banque : quelle compétence peut profiter de quels objets, et à quel perso les donner ---------- */
 let xb=Object.assign({src:'',open:null},store.get('xb',{}));const xbSave=()=>store.set('xb',xb);
-const XB_SKILLS=['Attack','Strength','Defence','Ranged','Prayer','Magic','Runecraft','Construction','Hitpoints','Agility','Herblore','Thieving','Crafting','Fletching','Slayer','Hunter','Mining','Smithing','Fishing','Cooking','Firemaking','Woodcutting','Farming','Sailing'];
+const XB_SKILLS=['Prayer','Cooking','Firemaking','Fletching','Crafting','Smithing','Herblore','Construction','Runecraft']; // compétences de transformation : l'objet en banque EST la matière (les métiers de récolte utilisent appâts et outils)
 function xbCalc(only){const S=empStock(only);const have={};Object.values(S).forEach(o=>{have[(MAP[o.id]?MAP[o.id].name:o.name).toLowerCase()]=o.q});
   const res={};const E=eng();
   for(const sk of XB_SKILLS){const R=[];RECIPES.forEach(r=>{if(r.oneOff||!r.mats.length)return;const s=(r.sk||[]).find(x=>x.n===sk&&x.xp>0);if(!s)return;
       if(!r.mats.some(m=>have[m.n.toLowerCase()]))return;R.push({r,s})});
-    R.sort((a,b)=>b.s.xp-a.s.xp);const pool=Object.assign({},have);let xp=0,xpBuy=0,cost=0;const used=[];const seen=new Set();
+    const eff=x=>x.s.xp/Math.max(1,x.r.mats.filter(m=>have[m.n.toLowerCase()]).reduce((a,m)=>a+m.q,0));R.sort((a,b)=>eff(b)-eff(a));const pool=Object.assign({},have);let xp=0,xpBuy=0,cost=0;const used=[];const seen=new Set();
     for(const {r,s} of R){const sig=r.out+'|'+r.mats.map(m=>m.q+m.n).join(',');if(seen.has(sig))continue;seen.add(sig);
       const mine=r.mats.filter(m=>pool[m.n.toLowerCase()]>0);if(!mine.length)continue;
       const nAll=Math.min(...r.mats.map(m=>Math.floor((pool[m.n.toLowerCase()]||0)/m.q)));const nMine=Math.min(...mine.map(m=>Math.floor(pool[m.n.toLowerCase()]/m.q)));
       if(nAll>0){r.mats.forEach(m=>pool[m.n.toLowerCase()]-=nAll*m.q);xp+=nAll*s.xp;used.push({r,s,n:nAll,buy:0,c:0})}
       else if(nMine>0){const miss=r.mats.filter(m=>!(pool[m.n.toLowerCase()]>0));const src=miss.map(m=>E.src(m.n,1));if(src.some(x=>!x))continue;
-        const c=src.reduce((a,x,i)=>a+x.p*miss[i].q,0)*nMine;mine.forEach(m=>pool[m.n.toLowerCase()]-=nMine*m.q);xpBuy+=nMine*s.xp;cost+=c;used.push({r,s,n:nMine,buy:1,c,miss:miss.map(m=>m.n)})}}
+        const c=src.reduce((a,x,i)=>a+x.p*miss[i].q,0)*nMine;if(c/(nMine*s.xp)>30)continue; /* plus de 30 gp par XP : pas « dormant » */mine.forEach(m=>pool[m.n.toLowerCase()]-=nMine*m.q);xpBuy+=nMine*s.xp;cost+=c;used.push({r,s,n:nMine,buy:1,c,miss:miss.map(m=>m.n)})}}
     if(xp||xpBuy)res[sk]={xp,xpBuy,cost,used}}
   return res}
 function xbLv(who,sk){const P=empBanks[who];return P&&P.skills&&P.skills.lv?P.skills.lv[sk]||1:null}
@@ -4337,7 +4341,7 @@ function renderXb(){const host=hostBox();$('#filters').innerHTML='';$('#more').h
   const R=xbCalc(xb.src||null);const withSk=Object.keys(empBanks).filter(w=>empBanks[w].skills);
   const ico=s=>`<img class="ri-ico" src="${WIKI}images/${encodeURIComponent(s)}_icon.png" alt="" onerror="this.style.display='none'">`;
   let h=`<section class="box"><div class="pf-ctl"><label class="small">Objets de <select id="xbSrc"><option value="">tout l'empire</option>${persos.map(p=>`<option ${xb.src===p?'selected':''}>${esc(p)}</option>`).join('')}</select></label>
-    <span class="small mut">${withSk.length} perso(s) avec compétences exportées · XP « réalisable » = tous les ingrédients sont déjà en banque ; « en achetant » = il manque des ingrédients, achetés au moins cher.</span></div></section>`;
+    <span class="small mut">${withSk.length} perso(s) avec compétences exportées · XP « réalisable » = tous les ingrédients sont déjà en banque ; « en achetant » = il manque des ingrédients, achetés au moins cher (seulement si ça coûte ≤ 30 gp par XP). Compétences de transformation seulement (Prière, Cuisine, Firemaking, Fletching, Artisanat, Forge, Herblore, Construction, Runecraft).</span></div></section>`;
   const rows=Object.entries(R).sort((a,b)=>(b[1].xp+b[1].xpBuy)-(a[1].xp+a[1].xpBuy));
   h+=`<section class="box">${rows.length?`<div class="tablewrap"><table class="eqt xb-t"><thead><tr><th class="l">Compétence</th><th>XP réalisable</th><th>+ en achetant</th><th>Coût du complément</th><th class="l">Principales sources</th><th class="l">Si tu donnes tout à…</th></tr></thead><tbody>${rows.map(([sk,o])=>{
       const src=o.used.slice().sort((a,b)=>b.n*b.s.xp-a.n*a.s.xp).slice(0,3).map(u=>`${esc(u.r.mats.map(m=>m.n).join(' + '))}${u.buy?' 🛒':''} → ${gp(u.n*u.s.xp)}`).join('<br>');
